@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "TRADUMUST Sign Interpreter",
+  "version": "1.0.0",
+  "description": "Real-time speech-to-sign-language avatar overlay for Zoom, Google Meet, and Microsoft Teams. Designed for Deaf/HoH accessibility.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TRADUMUST Sign Interpreter",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://app.zoom.us/*",
+        "https://zoom.us/*",
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://whereby.com/*",
+        "https://web.skype.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabCapture"
+  ],
+  "host_permissions": [
+    "https://app.zoom.us/*",
+    "https://zoom.us/*",
+    "https://meet.google.com/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["overlay.html", "overlay.js", "icons/*"],
+      "matches": [
+        "https://app.zoom.us/*",
+        "https://zoom.us/*",
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://whereby.com/*",
+        "https://web.skype.com/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' https://cdn.jsdelivr.net; object-src 'self'"
+  }
+}
