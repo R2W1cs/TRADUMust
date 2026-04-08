@@ -3,24 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/lib/use-debounce";
 import Link from "next/link";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-interface TranslationResult {
-  translated_text: string;
-  cultural_note: string;
-  formality_level: "formal" | "informal" | "neutral";
-  regional_variant: string;
-  formality_detail?: string;
-}
-
-interface SavedTranslation {
-  id: string;
-  source: string;
-  result: TranslationResult;
-  sourceLang: string;
-  targetLang: string;
-  timestamp: number;
-}
+import {
+  getTranslationHistory,
+  savePhrasebookEntry,
+  translateText,
+  type HistoryEntry,
+  type TranslationResult,
+} from "@/lib/api-client";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const LANGUAGES = [
@@ -104,31 +93,48 @@ export default function TranslatePage() {
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingPhrasebook, setSavingPhrasebook] = useState(false);
+  const [currentEntry, setCurrentEntry] = useState<HistoryEntry | null>(null);
 
   // Real-time: debounce input + target lang changes → auto-translate
   const debouncedInput = useDebounce(inputText, 500);
   const debouncedTarget = useDebounce(targetLang, 300);
   const [savedToPhrasebook, setSavedToPhrasebook] = useState(false);
-  const [recentTranslations, setRecentTranslations] = useState<SavedTranslation[]>([]);
+  const [recentTranslations, setRecentTranslations] = useState<HistoryEntry[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [speakLoading, setSpeakLoading] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const MAX_CHARS = 500;
 
-  // Load recent from localStorage and preload speechSynthesis voices
+  // Load recent history from the backend and preload speechSynthesis voices
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("tradumust_recent");
-      if (stored) setRecentTranslations(JSON.parse(stored));
-    } catch (_) {}
+    let cancelled = false;
 
-    // Preload speech synthesis voices (fixes issue where initial click uses default voice because voices aren't loaded)
+    getTranslationHistory(10)
+      .then((entries) => {
+        if (!cancelled) {
+          setRecentTranslations(entries);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecentTranslations([]);
+        }
+      });
+
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.getVoices();
       window.speechSynthesis.onvoiceschanged = () => {
         window.speechSynthesis.getVoices();
       };
     }
+
+    return () => {
+      cancelled = true;
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
   }, []);
 
   // Auto-translate whenever debounced input or target language changes
@@ -139,10 +145,8 @@ export default function TranslatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedInput, debouncedTarget]);
 
-  const saveRecent = useCallback((entry: SavedTranslation, prev: SavedTranslation[]) => {
-    const next = [entry, ...prev.filter((t) => t.id !== entry.id)].slice(0, 10);
-    setRecentTranslations(next);
-    localStorage.setItem("tradumust_recent", JSON.stringify(next));
+  const saveRecent = useCallback((entry: HistoryEntry) => {
+    setRecentTranslations((prev) => [entry, ...prev.filter((t) => t.id !== entry.id)].slice(0, 10));
   }, []);
 
   // ── Translate ────────────────────────────────────────────────────────────
@@ -153,59 +157,42 @@ export default function TranslatePage() {
     setSavedToPhrasebook(false);
 
     try {
-      // Actual API Integration
-      const response = await fetch("http://127.0.0.1:8000/api/translate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: inputText,
-          source_lang: sourceLang,
-          target_lang: targetLang,
-        }),
+      const response = await translateText({
+        text: inputText,
+        source_lang: sourceLang,
+        target_lang: targetLang,
       });
 
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-
-      const mockResult: TranslationResult = await response.json();
-      setResult(mockResult);
-      
-      const entry: SavedTranslation = {
-        id: Date.now().toString(),
-        source: inputText,
-        result: mockResult,
-        sourceLang,
-        targetLang,
-        timestamp: Date.now(),
-      };
-      saveRecent(entry, recentTranslations);
+      const { history_entry, ...translation } = response;
+      setResult(translation);
+      setCurrentEntry(history_entry);
+      setSavedToPhrasebook(history_entry.isPhrasebook);
+      saveRecent(history_entry);
     } catch (err) {
-      setError("Translation failed. Check your connection and try again.");
+      setError(err instanceof Error ? err.message : "Translation failed. Check your connection and try again.");
       setResult(null);
+      setCurrentEntry(null);
     } finally {
       setLoading(false);
     }
-  }, [inputText, sourceLang, targetLang, recentTranslations, saveRecent]);
+  }, [inputText, sourceLang, targetLang, saveRecent]);
 
   // ── Save to Phrasebook ────────────────────────────────────────────────────
-  const saveToPhrasebook = () => {
-    if (!result) return;
-    const entry = {
-      id: Date.now().toString(),
-      source: inputText,
-      result,
-      sourceLang,
-      targetLang,
-      timestamp: Date.now(),
-    };
+  const saveToPhrasebook = async () => {
+    if (!currentEntry || savedToPhrasebook) return;
+    setSavingPhrasebook(true);
     try {
-      const existing = JSON.parse(localStorage.getItem("tradumust_phrasebook") || "[]");
-      localStorage.setItem("tradumust_phrasebook", JSON.stringify([entry, ...existing]));
+      const response = await savePhrasebookEntry(currentEntry.id);
       setSavedToPhrasebook(true);
-    } catch (_) {}
+      setCurrentEntry(response.entry);
+      setRecentTranslations((prev) =>
+        prev.map((entry) => (entry.id === response.entry.id ? response.entry : entry))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Saving to phrasebook failed.");
+    } finally {
+      setSavingPhrasebook(false);
+    }
   };
 
   // ── Speak Aloud ────────────────────────────────────────────────────────────
@@ -394,7 +381,12 @@ export default function TranslatePage() {
                 </span>
               )}
               <button
-                onClick={() => { setInputText(""); setResult(null); }}
+                onClick={() => {
+                  setInputText("");
+                  setResult(null);
+                  setCurrentEntry(null);
+                  setSavedToPhrasebook(false);
+                }}
                 className="text-xs text-slate-400 hover:text-red-500 transition-colors"
               >
                 Clear ✕
@@ -448,14 +440,14 @@ export default function TranslatePage() {
                   </button>
                   <button
                     onClick={saveToPhrasebook}
-                    disabled={savedToPhrasebook}
+                    disabled={savedToPhrasebook || savingPhrasebook}
                     className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                       savedToPhrasebook
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-slate-100 hover:bg-emerald-100 hover:text-emerald-700 text-slate-600"
                     }`}
                   >
-                    {savedToPhrasebook ? "✓ Saved!" : "📚 Save to Phrasebook"}
+                    {savedToPhrasebook ? "✓ Saved!" : savingPhrasebook ? "Saving..." : "📚 Save to Phrasebook"}
                   </button>
                 </div>
               </div>
@@ -489,9 +481,11 @@ export default function TranslatePage() {
                       key={item.id}
                       onClick={() => {
                         setInputText(item.source);
-                        setSourceLang(item.sourceLang);
-                        setTargetLang(item.targetLang);
+                        setSourceLang(item.sourceLang ?? "auto");
+                        setTargetLang(item.targetLang ?? targetLang);
                         setResult(item.result);
+                        setCurrentEntry(item);
+                        setSavedToPhrasebook(item.isPhrasebook);
                       }}
                       className="w-full text-left p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors"
                     >

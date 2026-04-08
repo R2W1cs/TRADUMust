@@ -5,3 +5,7 @@ __pycache__/
 .env
 .env.local
 .DS_Store
+api/storage/*.sqlite
+api/storage/*.sqlite-shm
+api/storage/*.sqlite-wal
+api/storage/*.log

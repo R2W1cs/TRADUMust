@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Signer2D } from "@/components/Signer2D";
 import { type WordMeta } from "@/components/VisualGlossBoard";
+import { createTextToSign, getSignHistory, type HistoryEntry } from "@/lib/api-client";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Mode = "understand" | "express";
@@ -280,6 +281,8 @@ export default function SignPage() {
   const [avatarAnimating, setAvatarAnimating] = useState(false);
   const [glossData, setGlossData] = useState<{ sentiment?: any; metadata?: WordMeta[] }>({});
   const [currentSign, setCurrentSign] = useState<{ word: string; tag: string } | null>(null);
+  const [signHistory, setSignHistory] = useState<HistoryEntry[]>([]);
+  const [signApiError, setSignApiError] = useState<string | null>(null);
   const signTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // AI Stability: Temporal Smoothing for Gestures
@@ -292,6 +295,26 @@ export default function SignPage() {
       setTipIndex((i) => (i + 1) % SIGN_TIPS.length);
     }, 8000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getSignHistory(6)
+      .then((entries) => {
+        if (!cancelled) {
+          setSignHistory(entries);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSignHistory([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Ensure recognizing state correctly reflects loading or active model
@@ -353,44 +376,32 @@ export default function SignPage() {
   const animateAvatar = useCallback(async () => {
     if (!expressInput.trim()) return;
     setAvatarAnimating(true);
+    setSignApiError(null);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/text-to-sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: expressInput, sign_language: "ASL" })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
+      const data = await createTextToSign({ text: expressInput, sign_language: "ASL" });
 
-        // Build a duration lookup from animation_clips: word → duration_ms
-        const durationMap: Record<string, number> = {};
-        if (Array.isArray(data.animation_clips)) {
-          for (const clip of data.animation_clips) {
-            durationMap[clip.word?.toUpperCase()] = clip.duration_ms;
-          }
+      const durationMap: Record<string, number> = {};
+      if (Array.isArray(data.animation_clips)) {
+        for (const clip of data.animation_clips) {
+          durationMap[clip.word?.toUpperCase()] = clip.duration_ms;
         }
-
-        // Merge duration_ms into each metadata entry
-        const mergedMeta: WordMeta[] = (data.syntactic_metadata ?? []).map(
-          (m: { word: string; tag: string }) => ({
-            ...m,
-            duration_ms: durationMap[m.word?.toUpperCase()],
-          })
-        );
-
-        setGlossData({ sentiment: data.sentiment, metadata: mergedMeta });
-
-        // Let VisualGlossBoard's onComplete fire naturally; fall back to a
-        // computed timeout so the button re-enables even if onComplete is missed.
-        const totalDuration = mergedMeta.reduce((acc, m) => acc + (m.duration_ms ?? 1100), 0);
-        setTimeout(() => setAvatarAnimating(false), totalDuration + 1000);
-      } else {
-        setAvatarAnimating(false);
       }
+
+      const mergedMeta: WordMeta[] = (data.syntactic_metadata ?? []).map(
+        (m: { word: string; tag: string }) => ({
+          ...m,
+          duration_ms: durationMap[m.word?.toUpperCase()],
+        })
+      );
+
+      setGlossData({ sentiment: data.sentiment, metadata: mergedMeta });
+      setSignHistory((prev) => [data.history_entry, ...prev.filter((entry) => entry.id !== data.history_entry.id)].slice(0, 6));
+
+      const totalDuration = mergedMeta.reduce((acc, m) => acc + (m.duration_ms ?? 1100), 0);
+      setTimeout(() => setAvatarAnimating(false), totalDuration + 1000);
     } catch (err) {
-      console.error("AI Fetch Error:", err);
+      setSignApiError(err instanceof Error ? err.message : "The signing service is unavailable.");
       setAvatarAnimating(false);
     }
   }, [expressInput]);
@@ -608,6 +619,16 @@ export default function SignPage() {
                     </p>
                   </div>
                 </div>
+
+                {signApiError && (
+                  <div className="mt-4 flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <span className="text-lg">⚠️</span>
+                    <div>
+                      <p className="text-xs font-semibold text-red-800 mb-0.5">Signing request failed</p>
+                      <p className="text-sm text-red-900">{signApiError}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -657,6 +678,35 @@ export default function SignPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <span>🕐</span> Recent Sign Sessions
+            </h3>
+            {signHistory.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Text-to-sign requests will appear here after you animate the avatar.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {signHistory.map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => {
+                      setMode("express");
+                      setExpressInput(entry.source);
+                    }}
+                    className="w-full text-left p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-purple-200 hover:bg-purple-50/30 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-slate-800 truncate">{entry.source}</p>
+                    <p className="text-xs text-purple-600 mt-1 truncate">
+                      {entry.wordSequence.length > 0 ? entry.wordSequence.join(" • ") : entry.result.translated_text}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Regional Variation Alert */}

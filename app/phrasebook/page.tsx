@@ -2,21 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-interface PhrasebookEntry {
-  id: string;
-  source: string;
-  result: {
-    translated_text: string;
-    cultural_note: string;
-    formality_level: string;
-    regional_variant: string;
-  };
-  sourceLang: string;
-  targetLang: string;
-  timestamp: number;
-}
+import {
+  deletePhrasebookEntry,
+  getPhrasebookEntries,
+  type HistoryEntry,
+} from "@/lib/api-client";
 
 type ViewMode = "grid" | "list";
 type PracticeStep = "question" | "reveal" | "done";
@@ -42,7 +32,7 @@ function PracticeModal({
   phrases,
   onClose,
 }: {
-  phrases: PhrasebookEntry[];
+  phrases: HistoryEntry[];
   onClose: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -51,6 +41,8 @@ function PracticeModal({
 
   const current = phrases[index];
   const isLast = index === phrases.length - 1;
+  const sourceLang = current.sourceLang ?? "auto";
+  const targetLang = current.targetLang ?? "en";
 
   const answer = (correct: boolean) => {
     setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), wrong: s.wrong + (correct ? 0 : 1) }));
@@ -117,9 +109,9 @@ function PracticeModal({
 
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 text-center mb-6 min-h-[120px] flex flex-col items-center justify-center">
           <p className="text-xs text-slate-400 mb-3">
-            {LANG_FLAGS[current.sourceLang] ?? "🌐"} {LANG_LABELS[current.sourceLang] ?? current.sourceLang}
+            {LANG_FLAGS[sourceLang] ?? "🌐"} {LANG_LABELS[sourceLang] ?? sourceLang}
             {" → "}
-            {LANG_FLAGS[current.targetLang] ?? "🌐"} {LANG_LABELS[current.targetLang] ?? current.targetLang}
+            {LANG_FLAGS[targetLang] ?? "🌐"} {LANG_LABELS[targetLang] ?? targetLang}
           </p>
           <p className="text-xl font-semibold text-slate-900">{current.source}</p>
           <p className="text-sm text-slate-400 mt-2">What is the translation?</p>
@@ -165,13 +157,15 @@ function PhraseCard({
   onDelete,
   mode,
 }: {
-  entry: PhrasebookEntry;
+  entry: HistoryEntry;
   onDelete: (id: string) => void;
   mode: ViewMode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const sourceLangLabel = LANG_LABELS[entry.sourceLang] ?? entry.sourceLang;
-  const targetLangLabel = LANG_LABELS[entry.targetLang] ?? entry.targetLang;
+  const sourceLang = entry.sourceLang ?? "auto";
+  const targetLang = entry.targetLang ?? "en";
+  const sourceLangLabel = LANG_LABELS[sourceLang] ?? sourceLang;
+  const targetLangLabel = LANG_LABELS[targetLang] ?? targetLang;
 
   if (mode === "list") {
     return (
@@ -179,7 +173,7 @@ function PhraseCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-xs font-medium text-slate-500">
-              {LANG_FLAGS[entry.sourceLang] ?? "🌐"} {sourceLangLabel} → {LANG_FLAGS[entry.targetLang] ?? "🌐"} {targetLangLabel}
+              {LANG_FLAGS[sourceLang] ?? "🌐"} {sourceLangLabel} → {LANG_FLAGS[targetLang] ?? "🌐"} {targetLangLabel}
             </span>
             <span className="text-xs text-slate-400">{formatDate(entry.timestamp)}</span>
           </div>
@@ -203,11 +197,11 @@ function PhraseCard({
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
-            {LANG_FLAGS[entry.sourceLang] ?? "🌐"} {sourceLangLabel}
+            {LANG_FLAGS[sourceLang] ?? "🌐"} {sourceLangLabel}
           </span>
           <span className="text-slate-300 text-xs">→</span>
           <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-            {LANG_FLAGS[entry.targetLang] ?? "🌐"} {targetLangLabel}
+            {LANG_FLAGS[targetLang] ?? "🌐"} {targetLangLabel}
           </span>
         </div>
         <button
@@ -262,30 +256,47 @@ function PhraseCard({
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function PhrasebookPage() {
-  const [phrases, setPhrases] = useState<PhrasebookEntry[]>([]);
+  const [phrases, setPhrases] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [practicing, setPracticing] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("tradumust_phrasebook");
-      if (stored) setPhrases(JSON.parse(stored));
-    } catch (_) {}
-    setLoaded(true);
+    let cancelled = false;
+
+    getPhrasebookEntries()
+      .then((entries) => {
+        if (!cancelled) {
+          setPhrases(entries);
+          setLoaded(true);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load your phrasebook.");
+          setLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const deletePhrase = useCallback((id: string) => {
-    setPhrases((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      localStorage.setItem("linguabridge_phrasebook", JSON.stringify(next));
-      return next;
-    });
+    deletePhrasebookEntry(id)
+      .then(() => {
+        setPhrases((prev) => prev.filter((p) => p.id !== id));
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to remove the phrasebook entry.");
+      });
   }, []);
 
   // Unique target languages present in phrasebook
-  const uniqueLangs = [...new Set(phrases.map((p) => p.targetLang))];
+  const uniqueLangs = Array.from(new Set(phrases.map((p) => p.targetLang).filter(Boolean))) as string[];
 
   const filtered = filter === "all"
     ? phrases
@@ -365,6 +376,16 @@ export default function PhrasebookPage() {
             )}
           </div>
         </div>
+
+        {error && (
+          <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6">
+            <span className="text-red-500 text-lg shrink-0">⚠️</span>
+            <div>
+              <p className="text-sm font-semibold text-red-700">Phrasebook unavailable</p>
+              <p className="text-xs text-red-600 mt-0.5">{error}</p>
+            </div>
+          </div>
+        )}
 
         {/* Stats bar */}
         {phrases.length > 0 && (
