@@ -39,56 +39,7 @@ const LANGUAGES = [
 
 const TARGET_LANGUAGES = LANGUAGES.filter((l) => l.code !== "auto");
 
-// Mock translation engine (swap in real API call here)
-const MOCK_TRANSLATIONS: Record<string, TranslationResult> = {
-  fr: {
-    translated_text: "Bonjour, comment allez-vous ?",
-    cultural_note:
-      "In French professional and academic contexts, 'vous' is the polite form. Using 'tu' with a professor or stranger is considered presumptuous.",
-    formality_level: "formal",
-    regional_variant: "France French (Hexagonal)",
-    formality_detail:
-      "🇫🇷 Vous vs Tu: French has two words for 'you'. 'Vous' is formal — used with strangers, authority figures, and in academic settings. 'Tu' is informal — reserved for friends and family. As an exchange student, always default to 'vous' with professors.",
-  },
-  es: {
-    translated_text: "Hola, ¿cómo está usted?",
-    cultural_note:
-      "In formal Spanish, 'usted' is used with authority figures. However, Latin American Spanish tends to be less formal than Castilian Spanish in casual settings.",
-    formality_level: "formal",
-    regional_variant: "Latin American Spanish",
-    formality_detail:
-      "🇪🇸 Usted vs Tú: Spanish distinguishes 'usted' (formal) from 'tú' (informal). In Spain, 'vosotros' is used for informal plural. In Latin America, 'ustedes' covers both formal and informal plural. Always check regional norms!",
-  },
-  ja: {
-    translated_text: "こんにちは、お元気ですか？",
-    cultural_note:
-      "Japanese has multiple speech levels. 'Desu/masu' form is polite and appropriate for all academic and professional interactions for exchange students.",
-    formality_level: "formal",
-    regional_variant: "Standard Japanese (Hyōjungo)",
-    formality_detail:
-      "🇯🇵 Japanese Honorifics (Keigo): Japanese formality is embedded grammatically. 'Teineigo' (polite language) uses desu/masu forms. 'Sonkeigo' elevates the listener, 'kenjōgo' humbles the speaker. As an exchange student, master teineigo first — it covers 95% of situations.",
-  },
-  de: {
-    translated_text: "Hallo, wie geht es Ihnen?",
-    cultural_note:
-      "'Sie' (formal) vs 'du' (informal) is important in German academic settings. Direct address of professors by first name is uncommon — use 'Herr/Frau + last name'.",
-    formality_level: "formal",
-    regional_variant: "Standard German (Hochdeutsch)",
-    formality_detail:
-      "🇩🇪 Sie vs Du: German formality mirrors French in structure. 'Sie' (capitalized) is formal. Offering 'du' to someone is an explicit invitation to a closer relationship. In German universities, wait for professors to initiate the 'du' relationship.",
-  },
-};
-
-const DEFAULT_RESULT: TranslationResult = {
-  translated_text: "Hello, how are you?",
-  cultural_note:
-    "English is widely used as a lingua franca in international academic settings. Tone and context matter more than strict formality rules.",
-  formality_level: "neutral",
-  regional_variant: "International English",
-  formality_detail:
-    "🌐 English as a Lingua Franca: In international academic environments, English often serves as a neutral meeting point. However, British English, American English, and Australian English have subtle vocabulary and formality differences worth knowing.",
-};
-
+// Mock translation logic has been removed to integrate actual real data API.
 // ── Sub-components ─────────────────────────────────────────────────────────
 function FormalityBadge({ level }: { level: TranslationResult["formality_level"] }) {
   const styles = {
@@ -164,12 +115,20 @@ export default function TranslatePage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const MAX_CHARS = 500;
 
-  // Load recent from localStorage
+  // Load recent from localStorage and preload speechSynthesis voices
   useEffect(() => {
     try {
       const stored = localStorage.getItem("tradumust_recent");
       if (stored) setRecentTranslations(JSON.parse(stored));
     } catch (_) {}
+
+    // Preload speech synthesis voices (fixes issue where initial click uses default voice because voices aren't loaded)
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
   }, []);
 
   // Auto-translate whenever debounced input or target language changes
@@ -194,30 +153,41 @@ export default function TranslatePage() {
     setSavedToPhrasebook(false);
 
     try {
-      // Simulate API latency — replace with: fetch("/api/translate", { method:"POST", body: JSON.stringify({...}) })
-      await new Promise((r) => setTimeout(r, 700));
-      const mock = MOCK_TRANSLATIONS[targetLang] ?? DEFAULT_RESULT;
-      const mockResult: TranslationResult = {
-        ...mock,
-        translated_text: targetLang === "en" ? inputText : mock.translated_text,
-      };
+      // Actual API Integration
+      const response = await fetch("http://127.0.0.1:8000/api/translate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: inputText,
+          source_lang: sourceLang,
+          target_lang: targetLang,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const mockResult: TranslationResult = await response.json();
       setResult(mockResult);
+      
+      const entry: SavedTranslation = {
+        id: Date.now().toString(),
+        source: inputText,
+        result: mockResult,
+        sourceLang,
+        targetLang,
+        timestamp: Date.now(),
+      };
+      saveRecent(entry, recentTranslations);
     } catch (err) {
       setError("Translation failed. Check your connection and try again.");
       setResult(null);
     } finally {
       setLoading(false);
     }
-
-    const entry: SavedTranslation = {
-      id: Date.now().toString(),
-      source: inputText,
-      result: mockResult,
-      sourceLang,
-      targetLang,
-      timestamp: Date.now(),
-    };
-    saveRecent(entry, recentTranslations);
   }, [inputText, sourceLang, targetLang, recentTranslations, saveRecent]);
 
   // ── Save to Phrasebook ────────────────────────────────────────────────────
@@ -248,8 +218,39 @@ export default function TranslatePage() {
       zh: "zh-CN", ar: "ar-SA", pt: "pt-BR", ko: "ko-KR",
       it: "it-IT", en: "en-US",
     };
-    utterance.lang = langMap[targetLang] ?? "en-US";
+    const targetLangCode = langMap[targetLang] ?? "en-US";
+    utterance.lang = targetLangCode;
+
+    // Try to pick a high-quality, natural-sounding voice
+    const voices = window.speechSynthesis.getVoices();
+    const langPrefix = targetLangCode.split('-')[0].toLowerCase();
+    
+    // Filter voices that match the language (case-insensitive prefix match)
+    const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(langPrefix));
+    
+    if (matchingVoices.length > 0) {
+      // Prefer Premium, Natural, Google, or Microsoft voices as they sound less robotic
+      let bestVoice = matchingVoices.find(v => {
+        const name = v.name.toLowerCase();
+        return name.includes('premium') || name.includes('natural') || name.includes('google') || name.includes('microsoft');
+      });
+
+      // If no high-quality voice is found, fallback to the local service or first matching voice
+      if (!bestVoice) {
+        bestVoice = matchingVoices.find(v => v.localService) || matchingVoices[0];
+      }
+      
+      utterance.voice = bestVoice;
+      utterance.lang = bestVoice.lang; // Force the browser to use the exact locale of the specific voice picked
+    }
+
+    // Slightly reduce speech rate for better clarity and fluency
+    utterance.rate = 0.9;
     utterance.onend = () => setSpeakLoading(false);
+    utterance.onerror = (err) => {
+      console.error("Speech error", err);
+      setSpeakLoading(false); 
+    }; 
     window.speechSynthesis.speak(utterance);
   };
 

@@ -22,6 +22,8 @@ import json
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from deep_translator import GoogleTranslator
+from textblob import TextBlob, Word
 
 # ── App setup ────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -92,6 +94,8 @@ class TextToSignResponse(BaseModel):
     word_sequence: list[str]           # words to animate in order
     fingerspell_fallback: list[str]    # words with no known sign gloss -> fingerspell
     animation_clips: list[dict]        # [{"word": "hello", "clip_url": "/clips/hello.glb"}]
+    sentiment: dict                    # {"polarity": 0.x, "subjectivity": 0.x}
+    syntactic_metadata: list[dict]      # [{"word": "HELLO", "tag": "TIME"}]
 
 
 # ── Mock data ─────────────────────────────────────────────────────────────────
@@ -195,18 +199,7 @@ _CULTURAL_NOTES: dict[str, dict] = {
     },
 }
 
-# A minimal mock translation dictionary (real: call LibreTranslate or Google Translate API)
-_MOCK_TRANSLATIONS: dict[tuple[str, str], str] = {
-    ("en", "fr"): "Bonjour, comment allez-vous ?",
-    ("en", "es"): "Hola, ¿cómo está usted?",
-    ("en", "de"): "Hallo, wie geht es Ihnen?",
-    ("en", "ja"): "こんにちは、お元気ですか？",
-    ("en", "zh"): "你好，你好吗？",
-    ("en", "ar"): "مرحباً، كيف حالك؟",
-    ("en", "pt"): "Olá, como vai você?",
-    ("en", "ko"): "안녕하세요, 어떻게 지내세요?",
-    ("en", "it"): "Ciao, come sta?",
-}
+# No mock translations! We will use deep-translator.
 
 _MOCK_SIGNS = [
     "HELLO",
@@ -252,14 +245,17 @@ def translate_text(req: TranslateRequest):
     if not req.text.strip():
         raise HTTPException(status_code=422, detail="text field must not be empty")
 
-    detected_source = req.source_lang if req.source_lang != "auto" else "en"
+    detected_source = req.source_lang if req.source_lang != "auto" else "auto"
     target = req.target_lang
 
-    # Mock translation lookup
-    translated = _MOCK_TRANSLATIONS.get(
-        (detected_source, target),
-        req.text  # fallback: echo input (indicates unsupported pair in mock)
-    )
+    try:
+        translated = GoogleTranslator(source=detected_source, target=target).translate(req.text)
+    except Exception as e:
+        # Fallback if connection fails
+        translated = req.text
+
+    # Default to en for source if auto detected so cultural note lookup logic downstream won't crash
+    detected_source_display = detected_source if detected_source != "auto" else "en"
 
     # Cultural note for target language
     note_data = _CULTURAL_NOTES.get(target, _CULTURAL_NOTES["en"])
@@ -375,19 +371,68 @@ def text_to_sign(req: TextToSignRequest):
     if not req.text.strip():
         raise HTTPException(status_code=422, detail="text field must not be empty")
 
-    words = req.text.strip().split()
-    # Mock: words > 6 chars are treated as needing fingerspelling
-    word_sequence = [w.upper() for w in words]
-    fingerspell_fallback = [w.upper() for w in words if len(w) > 6]
+    blob = TextBlob(req.text)
+    
+    # 1. Sentiment Analysis
+    sentiment = {
+        "polarity": round(blob.sentiment.polarity, 2),
+        "subjectivity": round(blob.sentiment.subjectivity, 2)
+    }
+
+    # 2. Advanced ASL Glossing Logic
+    # ASL Structure Target: TIME + SUBJECT + OBJECT + VERB
+    # We use POS tags: NN (Noun), VB (Verb), JJ (Adj), RB (Adv), PRP (Pronoun), etc.
+    
+    tags = blob.tags
+    time_words = []
+    subjects = []
+    objects = []
+    verbs = []
+    others = []
+
+    time_keywords = {"tomorrow", "yesterday", "today", "now", "soon", "later", "morning", "night"}
+
+    for word, tag in tags:
+        w_lower = word.lower()
+        # Lemmatize all words to their root form (e.g., "going" -> "go")
+        lemma = Word(w_lower).lemmatize("v") if "VB" in tag else Word(w_lower).lemmatize()
+        upper_lemma = lemma.upper()
+
+        if w_lower in time_keywords or tag == "RB":
+            time_words.append({"word": upper_lemma, "tag": "TIME"})
+        elif tag in ["PRP", "NNP"] or (tag == "NN" and not subjects):
+            subjects.append({"word": upper_lemma, "tag": "SUBJECT"})
+        elif tag in ["NN", "NNS"]:
+            objects.append({"word": upper_lemma, "tag": "OBJECT"})
+        elif "VB" in tag:
+            verbs.append({"word": upper_lemma, "tag": "ACTION"})
+        else:
+            if upper_lemma not in ["A", "AN", "THE", "AM", "IS", "ARE", "BE"]: # Filter Basic Stopwords
+                others.append({"word": upper_lemma, "tag": "MODIFIER"})
+
+    # Reconstruct in ASL logic order
+    ordered_metadata = time_words + subjects + objects + verbs + others
+    
+    # Filter uniques while preserving order
+    unique_meta = []
+    seen = set()
+    for item in ordered_metadata:
+        if item["word"] not in seen:
+            unique_meta.append(item)
+            seen.add(item["word"])
+
+    word_sequence = [item["word"] for item in unique_meta]
+    fingerspell_fallback = [w for w in word_sequence if len(w) > 7]
 
     animation_clips = [
         {
-            "word": w.upper(),
-            "clip_url": f"/clips/asl/{w.lower()}.glb",  # placeholder URL
-            "fingerspell": len(w) > 6,
-            "duration_ms": 800 + len(w) * 60,
+            "word": item["word"],
+            "clip_url": f"/clips/asl/{item['word'].lower()}.glb",
+            "fingerspell": len(item["word"]) > 7,
+            "duration_ms": 700 + len(item["word"]) * 50,
+            "tag": item["tag"]
         }
-        for w in words
+        for item in unique_meta
     ]
 
     return TextToSignResponse(
@@ -395,6 +440,8 @@ def text_to_sign(req: TextToSignRequest):
         word_sequence=word_sequence,
         fingerspell_fallback=fingerspell_fallback,
         animation_clips=animation_clips,
+        sentiment=sentiment,
+        syntactic_metadata=unique_meta
     )
 
 

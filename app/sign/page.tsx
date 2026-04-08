@@ -2,23 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-
-// Dynamic import — Three.js is client-only and large
-const Avatar3D = dynamic(
-  () => import("@/components/Avatar3D").then((m) => ({ default: m.Avatar3D })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full aspect-video bg-gradient-to-br from-purple-900 to-indigo-900 rounded-xl flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-purple-300/40 border-t-purple-300 rounded-full animate-spin" />
-          <p className="text-purple-300 text-sm">Loading 3D Avatar...</p>
-        </div>
-      </div>
-    ),
-  }
-);
+import { Signer2D } from "@/components/Signer2D";
+import { type WordMeta } from "@/components/VisualGlossBoard";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Mode = "understand" | "express";
@@ -67,55 +52,24 @@ const COMMON_PHRASES: CommonPhrase[] = [
   { english: "Nice to meet you.", asl_note: "NICE + MEET + YOU. One of the most important social phrases for exchange students.", fingerspelling: undefined },
 ];
 
-// Mock recognized signs from webcam stream
-const MOCK_RECOGNIZED_SIGNS = [
-  "Hello, how are you?",
-  "I am fine, thank you.",
-  "Where is the cafeteria?",
-  "Can you help me?",
-  "I am an exchange student.",
-];
-
-// Fingerspelling chart (simplified — shows letter → hand icon emoji placeholder)
-const FINGERSPELL_EMOJIS: Record<string, string> = {
-  A:"🤜", B:"🖐️", C:"🤙", D:"☝️", E:"✊", F:"👌",
-  G:"👉", H:"🤞", I:"🤙", J:"🤙", K:"✌️", L:"🤟",
-  M:"✊", N:"✊", O:"👌", P:"👇", Q:"👇", R:"✌️",
-  S:"✊", T:"✊", U:"✌️", V:"✌️", W:"🖐️", X:"☝️",
-  Y:"🤙", Z:"☝️",
+// ── Hand Shape Translation Map ───────────────────────────────────────────────
+const GESTURE_TRANSLATIONS: Record<string, { meaning: string; notes: string }> = {
+  "Thumb Up": { meaning: "Good / Approve", notes: "In ASL, 'Good' is often signed from the chin down, but a thumbs up is a universal approval marker." },
+  "Thumb Down": { meaning: "Bad / Disapprove", notes: "Universally understood as a negative response." },
+  "Open Palm": { meaning: "Stop / Wait / 5", notes: "An open palm facing forward can mean wait or stop. It is also the number 5, or the base for 'Hello'." },
+  "Closed Fist": { meaning: "Yes / Letter 'S'", notes: "A closed fist with the thumb across it indicates the letter S or A, and nodding a fist means 'Yes'." },
+  "Pointing Up": { meaning: "You / Look Up / Letter 'D'", notes: "A single index finger pointing up is the letter D, or pointing to someone/something." },
+  "Victory": { meaning: "Peace / Number 2 / Letter 'V'", notes: "The classic V sign translates directly to the letter V and the number 2 in ASL." },
+  "ILoveYou": { meaning: "I Love You", notes: "A classic ASL sign combining the letters I, L, and Y into a single universal handshape." },
 };
 
 // ── Sub-components ─────────────────────────────────────────────────────────
-function FingerspellingBreakdown({ text }: { text: string }) {
-  const letters = text.toUpperCase().replace(/[^A-Z]/g, "").split("");
-  if (letters.length === 0) return null;
-
-  return (
-    <div className="mt-4">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-        Fingerspelling: <span className="text-purple-600">{text.toUpperCase()}</span>
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {letters.map((letter, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 bg-white border border-purple-200 rounded-xl px-3 py-2 shadow-sm">
-            <span className="text-2xl">{FINGERSPELL_EMOJIS[letter] ?? "✋"}</span>
-            <span className="text-xs font-bold text-purple-700">{letter}</span>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-slate-400 mt-2">
-        ℹ️ Emoji placeholders — real GLB hand-shape animations would render here.
-      </p>
-    </div>
-  );
-}
-
-
 function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onToggle: () => void; onRecognize: (text: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recognizerRef = useRef<any>(null);
+  const motionBufferRef = useRef<{ x: number; y: number; time: number }[]>([]);
   const [modelReady, setModelReady] = useState(false);
 
   useEffect(() => {
@@ -178,9 +132,38 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
                 
                 if (results.landmarks && results.landmarks.length > 0) {
                   const drawingUtils = new DrawingUtils(ctx);
-                  for (const landmarks of results.landmarks) {
-                    // Map unit landmarks to pixel space manually since drawingUtils sometimes expects fixed spaces
-                    const pixelLandmarks = landmarks.map((l: any) => ({
+                  const landmarks = results.landmarks[0];
+                  
+                  // Extract Palm Center for Motion Tracking
+                  const palm = landmarks[0];
+                  const now = performance.now();
+                  motionBufferRef.current.push({ x: palm.x, y: palm.y, time: now });
+                  if (motionBufferRef.current.length > 40) motionBufferRef.current.shift();
+
+                  // ── Pattern Recognition AI Engine (Handcrafted professional logic) ──
+                  const buffer = motionBufferRef.current;
+                  if (buffer.length === 40) {
+                    const dx = buffer[39].x - buffer[0].x;
+                    const dy = buffer[39].y - buffer[0].y;
+                    // 1. Detect Forward Push (e.g., "THANK YOU" move)
+                    if (dy > 0.2 && Math.abs(dx) < 0.1) {
+                       onRecognize("DYNAMIC_THANK_YOU");
+                    }
+
+                    // 2. Detect Circular Motion (e.g., "PLEASE")
+                    const midX = buffer.reduce((a, b) => a + b.x, 0) / 40;
+                    const midY = buffer.reduce((a, b) => a + b.y, 0) / 40;
+                    const variances = buffer.map(p => Math.sqrt((p.x - midX)**2 + (p.y - midY)**2));
+                    const avgRadius = variances.reduce((a, b) => a + b, 0) / 40;
+                    const stdDev = Math.sqrt(variances.reduce((a, b) => a + (b - avgRadius)**2, 0) / 40);
+                    
+                    if (avgRadius > 0.05 && stdDev < 0.02) {
+                       onRecognize("DYNAMIC_PLEASE");
+                    }
+                  }
+
+                  for (const lms of results.landmarks) {
+                    const pixelLandmarks = lms.map((l: any) => ({
                        x: l.x * canvas.width,
                        y: l.y * canvas.height,
                        z: l.z || 0
@@ -292,10 +275,16 @@ export default function SignPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [recognizedText, setRecognizedText] = useState("");
   const [recognizing, setRecognizing] = useState(false);
+  const [tipIndex, setTipIndex] = useState(0);
   const [expressInput, setExpressInput] = useState("Hello");
   const [avatarAnimating, setAvatarAnimating] = useState(false);
-  const [tipIndex, setTipIndex] = useState(0);
-  const recognizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [glossData, setGlossData] = useState<{ sentiment?: any; metadata?: WordMeta[] }>({});
+  const [currentSign, setCurrentSign] = useState<{ word: string; tag: string } | null>(null);
+  const signTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // AI Stability: Temporal Smoothing for Gestures
+  const smoothingBufferRef = useRef<Record<string, number>>({});
+  const SMOOTHING_THRESHOLD = 8; // Need 8 frames of consistency
 
   // Rotate tips
   useEffect(() => {
@@ -309,25 +298,121 @@ export default function SignPage() {
   useEffect(() => {
     if (!cameraActive) {
       setRecognizedText("");
+      setSentenceBuffer([]); // clear sentence when camera turns off
     }
   }, [cameraActive]);
 
-  // Animate avatar word-by-word
-  const animateAvatar = useCallback(() => {
-    if (!expressInput.trim()) return;
-    const words = expressInput.trim().split(/\s+/);
-    setAvatarAnimating(true);
-    let i = 0;
-    const advance = () => {
-      if (i >= words.length) {
-        setAvatarAnimating(false);
-        return;
-      }
-      i++;
-      setTimeout(advance, 900);
+  // ── New: Sentence Aggregation ──
+  const [sentenceBuffer, setSentenceBuffer] = useState<string[]>([]);
+  // To avoid spamming the same sign 10x per second, we keep track of the last added sign
+  const lastAddedSignRef = useRef<string | null>(null);
+  const signHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleRecognize = useCallback((rawLabel: string) => {
+    // 1. Stability Filter: Increment count for this sign
+    const buffer = smoothingBufferRef.current;
+    Object.keys(buffer).forEach(k => { if (k !== rawLabel) buffer[k] = Math.max(0, buffer[k] - 1); });
+    buffer[rawLabel] = (buffer[rawLabel] || 0) + 1;
+
+    // Only commit if we have enough confidence (consistency over time)
+    if (buffer[rawLabel] < SMOOTHING_THRESHOLD) return;
+
+    setRecognizedText(rawLabel);
+    setRecognizing(false);
+    
+    // Convert to a short, usable word for the sentence
+    const SHORT_TERMS: Record<string, string> = {
+      "Thumb Up": "Good",
+      "Thumb Down": "Bad",
+      "Open Palm": "Wait",
+      "Closed Fist": "Yes",
+      "Pointing Up": "You",
+      "Victory": "Peace",
+      "ILoveYou": "Love",
+      "DYNAMIC_THANK_YOU": "Thank You",
+      "DYNAMIC_PLEASE": "Please",
     };
-    advance();
+    
+    const word = SHORT_TERMS[rawLabel];
+    if (!word) return;
+
+    // Only add if it's different from the very last sign we added, OR if enough time has passed.
+    // For MVP, simply requiring them to change signs to add a new word is easiest.
+    if (lastAddedSignRef.current !== rawLabel) {
+       // Debounce slightly to ensure they hold the sign for ~500ms
+       if (signHoldTimerRef.current) clearTimeout(signHoldTimerRef.current);
+       
+       signHoldTimerRef.current = setTimeout(() => {
+           setSentenceBuffer(prev => [...prev, word]);
+           lastAddedSignRef.current = rawLabel;
+       }, 500);
+    }
+  }, []);
+
+  // Animate avatar word-by-word with AI Glossing
+  const animateAvatar = useCallback(async () => {
+    if (!expressInput.trim()) return;
+    setAvatarAnimating(true);
+    
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/text-to-sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: expressInput, sign_language: "ASL" })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+
+        // Build a duration lookup from animation_clips: word → duration_ms
+        const durationMap: Record<string, number> = {};
+        if (Array.isArray(data.animation_clips)) {
+          for (const clip of data.animation_clips) {
+            durationMap[clip.word?.toUpperCase()] = clip.duration_ms;
+          }
+        }
+
+        // Merge duration_ms into each metadata entry
+        const mergedMeta: WordMeta[] = (data.syntactic_metadata ?? []).map(
+          (m: { word: string; tag: string }) => ({
+            ...m,
+            duration_ms: durationMap[m.word?.toUpperCase()],
+          })
+        );
+
+        setGlossData({ sentiment: data.sentiment, metadata: mergedMeta });
+
+        // Let VisualGlossBoard's onComplete fire naturally; fall back to a
+        // computed timeout so the button re-enables even if onComplete is missed.
+        const totalDuration = mergedMeta.reduce((acc, m) => acc + (m.duration_ms ?? 1100), 0);
+        setTimeout(() => setAvatarAnimating(false), totalDuration + 1000);
+      } else {
+        setAvatarAnimating(false);
+      }
+    } catch (err) {
+      console.error("AI Fetch Error:", err);
+      setAvatarAnimating(false);
+    }
   }, [expressInput]);
+
+  // Drive Signer2D word-by-word from glossData.metadata
+  useEffect(() => {
+    signTimers.current.forEach(clearTimeout);
+    signTimers.current = [];
+    setCurrentSign(null);
+    if (!avatarAnimating || !glossData.metadata?.length) return;
+    const entries = glossData.metadata;
+    const TAG_DUR: Record<string, number> = { TIME: 900, SUBJECT: 1000, OBJECT: 1000, ACTION: 1300, MODIFIER: 800 };
+    function drive(i: number) {
+      if (i >= entries.length) { setCurrentSign(null); return; }
+      const e = entries[i];
+      setCurrentSign({ word: e.word, tag: e.tag });
+      const t = setTimeout(() => drive(i + 1), (e.duration_ms ?? TAG_DUR[e.tag] ?? 1100) + 120);
+      signTimers.current.push(t);
+    }
+    drive(0);
+    return () => { signTimers.current.forEach(clearTimeout); };
+  }, [avatarAnimating, glossData.metadata]);
 
   const currentTip = SIGN_TIPS[tipIndex];
 
@@ -395,10 +480,7 @@ export default function SignPage() {
                 <WebcamFeed 
                   active={cameraActive} 
                   onToggle={() => setCameraActive((v) => !v)} 
-                  onRecognize={(text) => {
-                     setRecognizedText(text);
-                     setRecognizing(false);
-                  }}
+                  onRecognize={handleRecognize}
                 />
               </div>
 
@@ -414,13 +496,43 @@ export default function SignPage() {
                   )}
                 </div>
 
-                <div className="min-h-[80px] bg-slate-50 rounded-lg border border-slate-200 p-4 flex items-center">
+                <div className="min-h-[120px] bg-slate-50 flex-col rounded-lg border border-slate-200 p-4 flex justify-center">
+                  
+                  {/* Accumulated Sentence Builder */}
+                  {sentenceBuffer.length > 0 && (
+                    <div className="mb-4 p-3 bg-white border border-purple-100 rounded-lg shadow-sm">
+                      <p className="text-xs font-bold text-purple-600 uppercase mb-1">Constructed Sentence:</p>
+                      <p className="text-2xl font-medium text-slate-800">
+                        {sentenceBuffer.join(" ")}
+                      </p>
+                      <button 
+                        onClick={() => setSentenceBuffer([])}
+                        className="text-xs text-slate-400 hover:text-red-500 mt-2 transition-colors"
+                      >
+                        Clear Sentence
+                      </button>
+                    </div>
+                  )}
+
                   {recognizedText ? (
-                    <p className="text-2xl font-medium text-slate-900">{recognizedText}</p>
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="flex items-end gap-3 mb-1">
+                        <p className="text-3xl font-bold text-purple-700">
+                          {GESTURE_TRANSLATIONS[recognizedText]?.meaning || recognizedText}
+                        </p>
+                        <span className="text-xs font-mono bg-slate-200 text-slate-600 px-2 py-1 rounded mb-1">
+                          Raw: {recognizedText}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 leading-relaxed max-w-lg mt-2">
+                        {GESTURE_TRANSLATIONS[recognizedText]?.notes || 
+                         "Raw ML output detected without a specific mapped cultural context."}
+                      </p>
+                    </div>
                   ) : (
                     <p className="text-slate-400 text-sm">
                       {cameraActive
-                        ? "Analyzing hand landmarks... start signing!"
+                        ? "Analyzing hand landmarks... hold up a sign!"
                         : "Start your camera to begin sign recognition."}
                     </p>
                   )}
@@ -474,19 +586,16 @@ export default function SignPage() {
                   </button>
                 </div>
 
-                <div className="w-full rounded-xl overflow-hidden" style={{ height: "340px" }}>
-                  <Avatar3D
-                    text={avatarAnimating ? expressInput : undefined}
-                    autoPlay={avatarAnimating}
-                    onComplete={() => setAvatarAnimating(false)}
-                    height="340px"
-                    showControls
+                <div className="flex flex-col items-center bg-white border border-slate-200 rounded-2xl py-6">
+                  <Signer2D
+                    word={currentSign?.word ?? ""}
+                    tag={currentSign?.tag}
+                    className="w-72 h-80"
                   />
+                  <p className={`mt-2 text-sm font-bold tracking-widest uppercase transition-opacity duration-300 ${currentSign ? "opacity-100 text-purple-600" : "opacity-0 text-slate-400"}`}>
+                    {currentSign?.word ?? "​"}
+                  </p>
                 </div>
-
-                {expressInput && (
-                  <FingerspellingBreakdown text={expressInput.split(" ")[0]} />
-                )}
 
                 <div className="mt-4 flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <span className="text-lg">📖</span>
