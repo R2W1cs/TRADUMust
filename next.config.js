@@ -11,6 +11,14 @@ const nextConfig = {
 
     return [
       {
+        source: "/api/ml/:path*",
+        destination: "http://127.0.0.1:8001/api/ml/:path*",
+      },
+      {
+        source: "/api/sign/:path*",
+        destination: "http://127.0.0.1:8001/api/sign/:path*",
+      },
+      {
         source: "/api/:path*",
         destination: `${apiProxyOrigin}/api/:path*`,
       },

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "backend": "php -S 127.0.0.1:8000 -t api/public api/router.php",
-    "backend:python": "uvicorn backend.main:app --reload --port 8000",
+    "backend:python": "uvicorn backend.main:app --reload --port 8001",
     "test": "node --test tests/unit/sign-mapper.test.js tests/unit/vocab-10k.test.js tests/unit/signer2d.test.js",
     "test:ext": "node --test tests/unit/sign-mapper.test.js tests/unit/vocab-10k.test.js tests/unit/signer2d.test.js",
     "test:backend": ".venv/Scripts/python -m pytest tests/backend/ -v",

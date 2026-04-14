@@ -45,17 +45,9 @@ desktop.ini
 # --- Claude Code internal ---
 .claude/
 
-# --- Large ML data (use Git LFS or keep local) ---
+# --- Large ML data ---
 data/
 backend/ml/wlasl_features/
 
-# --- ML model binaries (too large for git, keep local) ---
-*.pkl
-*.task
-*.npy
-backend/ml/trained_model.pkl
-backend/ml/models/
-public/models/
-
-# --- Training artifacts (regenerate locally) ---
+# --- Training artifacts ---
 backend/ml/__pycache__/
