@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!-- Open this in Chrome, then right-click each canvas → "Save image as" → icon16.png etc. -->
+<html>
+<head><title>SignBridge Icons</title></head>
+<body style="background:#111;display:flex;gap:20px;padding:20px;align-items:flex-end;flex-wrap:wrap">
+<script>
+function drawIcon(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  const s = size / 128;
+  const g = ctx.createRadialGradient(size*.4,size*.35,0,size/2,size/2,size/2);
+  g.addColorStop(0,'#6366F1'); g.addColorStop(1,'#312E81');
+  ctx.beginPath(); ctx.arc(size/2,size/2,size/2-1,0,Math.PI*2);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.95)';
+  // Palm
+  ctx.beginPath(); ctx.roundRect(42*s,68*s,44*s,28*s,10*s); ctx.fill();
+  // Thumb
+  ctx.beginPath(); ctx.roundRect(24*s,68*s,22*s,12*s,6*s); ctx.fill();
+  // Index
+  ctx.beginPath(); ctx.roundRect(76*s,28*s,12*s,44*s,6*s); ctx.fill();
+  // Pinky
+  ctx.beginPath(); ctx.roundRect(42*s,32*s,10*s,40*s,5*s); ctx.fill();
+}
+[16,48,128].forEach(size => {
+  const wrap = document.createElement('div');
+  wrap.style='display:flex;flex-direction:column;align-items:center;gap:6px';
+  const c = document.createElement('canvas');
+  c.width=c.height=size; c.style=`image-rendering:pixelated;border:1px solid #333`;
+  c.title=`Right-click → Save as icon${size}.png`;
+  drawIcon(c, size);
+  const lbl = document.createElement('div');
+  lbl.textContent=`icon${size}.png`; lbl.style='color:#888;font:10px monospace';
+  wrap.appendChild(c); wrap.appendChild(lbl);
+  document.body.appendChild(wrap);
+});
+</script>
+</body>
+</html>

@@ -1,69 +1,96 @@
 {
   "manifest_version": 3,
-  "name": "TRADUMUST Sign Interpreter",
+  "name": "SignBridge",
+  "short_name": "SignBridge",
   "version": "1.0.0",
-  "description": "Real-time speech-to-sign-language avatar overlay for Zoom, Google Meet, and Microsoft Teams. Designed for Deaf/HoH accessibility.",
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "TRADUMUST Sign Interpreter",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png"
-    }
-  },
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://app.zoom.us/*",
-        "https://zoom.us/*",
-        "https://meet.google.com/*",
-        "https://teams.microsoft.com/*",
-        "https://teams.live.com/*",
-        "https://whereby.com/*",
-        "https://web.skype.com/*"
-      ],
-      "js": ["content.js"],
-      "css": ["overlay.css"],
-      "run_at": "document_end"
-    }
-  ],
+  "description": "Real-time ASL avatar overlay for YouTube, Google Meet, Zoom & Teams. Accessibility for Deaf exchange students — part of LinguaBridge Academy.",
+
   "permissions": [
+    "tabCapture",
+    "storage",
     "activeTab",
     "scripting",
-    "storage",
-    "tabCapture"
+    "sidePanel",
+    "tabs",
+    "offscreen"
   ],
+
   "host_permissions": [
-    "https://app.zoom.us/*",
+    "https://www.youtube.com/*",
     "https://zoom.us/*",
     "https://meet.google.com/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*"
   ],
-  "web_accessible_resources": [
+
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+
+  "content_scripts": [
     {
-      "resources": ["overlay.html", "overlay.js", "icons/*"],
       "matches": [
-        "https://app.zoom.us/*",
+        "https://www.youtube.com/*",
         "https://zoom.us/*",
         "https://meet.google.com/*",
         "https://teams.microsoft.com/*",
-        "https://teams.live.com/*",
-        "https://whereby.com/*",
-        "https://web.skype.com/*"
+        "https://teams.live.com/*"
+      ],
+      "js": [
+        "content/platform-detector.js",
+        "content/storage-manager.js",
+        "content/sign-mapper.js",
+        "content/audio-processor.js",
+        "content/avatar-renderer.js",
+        "content/avatar-overlay.js",
+        "content/content-script.js"
+      ],
+      "css": ["content/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "SignBridge — Sign Language Accessibility",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["content/overlay.css", "icons/*", "content/vocab-10k.js"],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://zoom.us/*",
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*"
       ]
     }
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' https://cdn.jsdelivr.net; object-src 'self'"
+
+  "commands": {
+    "toggle-avatar": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Toggle SignBridge avatar overlay"
+    },
+    "toggle-captions": {
+      "suggested_key": { "default": "Alt+Shift+C" },
+      "description": "Toggle caption display"
+    }
   }
 }

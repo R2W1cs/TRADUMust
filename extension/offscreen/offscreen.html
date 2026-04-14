@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!--
+  SignBridge — Offscreen Document
+
+  This hidden page runs in a special Chrome offscreen context that has access
+  to USER_MEDIA APIs. It is created by the service worker when tab audio
+  capture is requested.
+
+  Purpose:
+    1. Receive a MediaStream ID from the service worker (via postMessage)
+    2. Call getUserMedia with chromeMediaSource:'tab' to get the audio stream
+    3. Process audio through Web Audio API for visualization/level detection
+    4. Forward the stream ID to SpeechRecognition if possible
+
+  Privacy: No audio is stored, recorded, or sent to any remote server.
+  All processing is entirely local to the browser.
+
+  Note: Web Speech API does not accept a custom MediaStream — it always uses
+  the default microphone input. Tab audio routing to SpeechRecognition would
+  require a custom VAD + Whisper WASM solution (planned for v1.1).
+  For now, this document handles audio level monitoring and future expansion.
+-->
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>SignBridge Audio Processor (Offscreen)</title>
+</head>
+<body>
+  <script src="offscreen.js"></script>
+</body>
+</html>

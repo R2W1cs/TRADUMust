@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SignBridge</title>
+  <link rel="stylesheet" href="popup.css"/>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────────── -->
+<header class="sb-header">
+  <div class="sb-logo">
+    <span class="sb-logo-icon">🤟</span>
+    <div>
+      <span class="sb-logo-name">SignBridge</span>
+      <span class="sb-logo-tag">LinguaBridge Academy</span>
+    </div>
+  </div>
+  <div id="status-badge" class="sb-badge sb-badge--inactive">Inactive</div>
+</header>
+
+<!-- ── Platform info ─────────────────────────────────────────────────────── -->
+<section class="sb-platform-bar" id="platform-bar">
+  <span id="platform-icon">🌐</span>
+  <span id="platform-name">Detecting platform…</span>
+  <span id="strategy-label" class="sb-strategy"></span>
+</section>
+
+<!-- ── Main toggle ───────────────────────────────────────────────────────── -->
+<section class="sb-card">
+  <div class="sb-toggle-row">
+    <div>
+      <div class="sb-label">Sign Language Avatar</div>
+      <div class="sb-sublabel">Overlay on video platforms</div>
+    </div>
+    <label class="sb-switch" title="Toggle avatar overlay">
+      <input type="checkbox" id="toggle-avatar"/>
+      <span class="sb-thumb"></span>
+    </label>
+  </div>
+</section>
+
+<!-- ── Caption setup prompt ──────────────────────────────────────────────── -->
+<section class="sb-card sb-caption-tip" id="caption-tip">
+  <div class="sb-tip-icon">💡</div>
+  <div>
+    <div class="sb-label">Enable Captions</div>
+    <p class="sb-tip-text" id="caption-instructions">
+      For best results, enable platform captions so SignBridge can translate them.
+    </p>
+  </div>
+</section>
+
+<!-- ── Settings ──────────────────────────────────────────────────────────── -->
+<section class="sb-card">
+  <div class="sb-section-title">Settings</div>
+
+  <!-- Animation speed -->
+  <div class="sb-row">
+    <label class="sb-label-sm" for="speed-select">Sign speed</label>
+    <select id="speed-select" class="sb-select">
+      <option value="0.5">Slow (0.5×)</option>
+      <option value="1.0" selected>Normal (1×)</option>
+      <option value="1.5">Fast (1.5×)</option>
+      <option value="2.0">Very fast (2×)</option>
+    </select>
+  </div>
+
+  <!-- Caption source -->
+  <div class="sb-row">
+    <label class="sb-label-sm" for="source-select">Caption source</label>
+    <select id="source-select" class="sb-select">
+      <option value="auto" selected>Auto (smart detection)</option>
+      <option value="platform">Platform captions only</option>
+      <option value="speech">Microphone (Web Speech)</option>
+    </select>
+  </div>
+
+  <!-- Show captions toggle -->
+  <div class="sb-toggle-row sb-toggle-row--sm">
+    <label class="sb-label-sm">Show text captions</label>
+    <label class="sb-switch sb-switch--sm">
+      <input type="checkbox" id="toggle-captions" checked/>
+      <span class="sb-thumb"></span>
+    </label>
+  </div>
+
+  <!-- Show hints toggle -->
+  <div class="sb-toggle-row sb-toggle-row--sm">
+    <label class="sb-label-sm">Show sign hints</label>
+    <label class="sb-switch sb-switch--sm">
+      <input type="checkbox" id="toggle-hints" checked/>
+      <span class="sb-thumb"></span>
+    </label>
+  </div>
+</section>
+
+<!-- ── Quick actions ─────────────────────────────────────────────────────── -->
+<section class="sb-actions">
+  <button id="btn-sidepanel" class="sb-btn sb-btn--primary">
+    📚 Open Educational Panel
+  </button>
+  <button id="btn-phrasebook" class="sb-btn sb-btn--ghost">
+    📖 My Phrasebook
+  </button>
+</section>
+
+<!-- ── Keyboard shortcut reminder ────────────────────────────────────────── -->
+<footer class="sb-footer">
+  <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> — Toggle avatar on/off
+</footer>
+
+<script src="popup.js"></script>
+</body>
+</html>

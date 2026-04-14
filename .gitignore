@@ -1,11 +1,61 @@
-node_modules/
-.next/
-.venv/
+# --- Python ---
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
 .env
 .env.local
+.env*.local
+
+# --- Node ---
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+# --- OS ---
 .DS_Store
+# --- Project specific ---
 api/storage/*.sqlite
 api/storage/*.sqlite-shm
 api/storage/*.sqlite-wal
 api/storage/*.log
+
+Thumbs.db
+desktop.ini
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Claude Code internal ---
+.claude/
+
+# --- Large ML data (use Git LFS or keep local) ---
+data/
+backend/ml/wlasl_features/
+
+# --- ML model binaries (too large for git, keep local) ---
+*.pkl
+*.task
+*.npy
+backend/ml/trained_model.pkl
+backend/ml/models/
+public/models/
+
+# --- Training artifacts (regenerate locally) ---
+backend/ml/__pycache__/

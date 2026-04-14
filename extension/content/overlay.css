@@ -1,0 +1,140 @@
+/**
+ * SignBridge — Overlay CSS
+ *
+ * All styles are scoped under #signbridge-avatar-overlay to avoid collisions
+ * with the host page stylesheet. Uses high-specificity selectors throughout.
+ *
+ * The overlay uses inline styles for dynamic values (position, size, opacity)
+ * because they come from user preferences stored in chrome.storage.sync.
+ * This file handles structural and animated styles only.
+ */
+
+/* ── Root overlay ─────────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay {
+  /* Layout and stacking — position/size/opacity set inline by JS */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+  border-radius: 12px;
+  overflow: visible;
+
+  /* Smooth appearance / disappearance */
+  transition: opacity 0.25s ease, transform 0.15s ease;
+
+  /* Prevent the overlay from capturing scroll or clicks outside its bounds */
+  pointer-events: auto;
+}
+
+#signbridge-avatar-overlay * {
+  box-sizing: border-box;
+}
+
+/* ── Visibility states ────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay.sb-hidden {
+  display: none !important;
+}
+
+/* ── Header drag bar ──────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-header {
+  border-radius: 12px 12px 0 0;
+  transition: background 0.2s;
+}
+#signbridge-avatar-overlay .sb-header:hover {
+  filter: brightness(1.15);
+}
+#signbridge-avatar-overlay .sb-header button:hover {
+  color: rgba(255, 255, 255, 0.9) !important;
+  transform: scale(1.15);
+}
+
+/* ── Avatar SVG wrap ──────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-avatar-wrap {
+  /* The SVG is injected as innerHTML — ensure it fills the container */
+  display: block;
+  width: 100%;
+}
+#signbridge-avatar-overlay .sb-avatar-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── Sign transition ──────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-avatar-wrap svg {
+  animation: sb-sign-in 0.18s ease-out;
+}
+@keyframes sb-sign-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Caption bar ──────────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-caption {
+  border-radius: 0;
+  transition: color 0.2s;
+  word-break: break-word;
+  animation: sb-caption-in 0.2s ease;
+}
+@keyframes sb-caption-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Hint tooltip ─────────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-hint {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: sb-hint-in 0.15s ease;
+}
+@keyframes sb-hint-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Resize handle ────────────────────────────────────────────────────────── */
+#signbridge-avatar-overlay .sb-resize {
+  transition: opacity 0.2s;
+  opacity: 0.4;
+}
+#signbridge-avatar-overlay:hover .sb-resize {
+  opacity: 1;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* Respect system-level accessibility preference.
+     All SVG animations are CSS-driven so they respond to this. */
+  #signbridge-avatar-overlay .sb-avatar-wrap svg *,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-wave,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-circle,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-push,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-pull,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-nod,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-shake,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-lift,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-flick,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-tap,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-wiggle,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-roll,
+  #signbridge-avatar-overlay .sb-avatar-wrap svg .motion-flip {
+    animation: none !important;
+  }
+
+  #signbridge-avatar-overlay .sb-avatar-wrap svg {
+    animation: none !important;
+  }
+
+  #signbridge-avatar-overlay .sb-caption {
+    animation: none !important;
+  }
+}
+
+/* ── High contrast override ───────────────────────────────────────────────── */
+@media (forced-colors: active) {
+  #signbridge-avatar-overlay {
+    border: 2px solid ButtonText;
+  }
+  #signbridge-avatar-overlay .sb-caption {
+    color: ButtonText;
+    background: ButtonFace;
+  }
+}

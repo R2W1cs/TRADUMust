@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SignBridge — Educational Panel</title>
+  <link rel="stylesheet" href="sidepanel.css"/>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────────── -->
+<header class="sp-header">
+  <div class="sp-logo">
+    <span>🤟</span>
+    <div>
+      <span class="sp-title">SignBridge</span>
+      <span class="sp-subtitle">Educational Panel</span>
+    </div>
+  </div>
+  <!-- Tab navigation -->
+  <nav class="sp-tabs" role="tablist" aria-label="Panel sections">
+    <button class="sp-tab sp-tab--active" data-tab="live" role="tab" aria-selected="true">Live</button>
+    <button class="sp-tab" data-tab="browse" role="tab" aria-selected="false">Browse</button>
+    <button class="sp-tab" data-tab="phrasebook" role="tab" aria-selected="false">Phrasebook</button>
+  </nav>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: Live ─ shows signs actively being displayed by the avatar         -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-live" class="sp-panel sp-panel--active" role="tabpanel">
+
+  <!-- Live status bar -->
+  <div class="sp-live-bar" id="live-bar">
+    <span id="live-indicator" class="sp-dot sp-dot--inactive"></span>
+    <span id="live-status-text">Waiting for captions…</span>
+    <span id="live-strategy" class="sp-strategy"></span>
+  </div>
+
+  <!-- Caption preview -->
+  <div class="sp-caption-box" id="caption-box">
+    <p class="sp-caption-hint">Caption text will appear here as audio is detected.</p>
+  </div>
+
+  <!-- Live sign stream (most recent signs shown here) -->
+  <div class="sp-live-signs" id="live-signs">
+    <!-- Populated by JS -->
+  </div>
+
+  <!-- Current sign detail card -->
+  <div class="sp-sign-detail" id="sign-detail" style="display:none">
+    <div class="sp-detail-header">
+      <span class="sp-detail-gloss" id="detail-gloss"></span>
+      <button class="sp-save-btn" id="btn-save-sign" title="Save to phrasebook">⭐ Save</button>
+    </div>
+    <div class="sp-detail-desc" id="detail-desc"></div>
+    <div class="sp-cultural-note" id="detail-cultural">
+      <span class="sp-cultural-icon">🌍</span>
+      <span id="detail-cultural-text"></span>
+    </div>
+    <div class="sp-detail-category" id="detail-category"></div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="sp-empty" id="live-empty">
+    <div class="sp-empty-icon">🤟</div>
+    <h3>SignBridge is listening</h3>
+    <p>Navigate to YouTube, Google Meet, Zoom, or Microsoft Teams and enable captions to see signs appear here.</p>
+    <div class="sp-tip-box">
+      <strong>First time?</strong> Click the extension icon and toggle on the avatar. Then enable your platform's captions for best results.
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: Browse ─ full sign dictionary browser                             -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-browse" class="sp-panel" role="tabpanel" hidden>
+
+  <div class="sp-browse-toolbar">
+    <input type="search" id="browse-search" class="sp-search"
+           placeholder="Search signs…" aria-label="Search sign dictionary"/>
+    <select id="browse-category" class="sp-select-sm" aria-label="Filter by category">
+      <option value="">All categories</option>
+      <option value="greetings">Greetings</option>
+      <option value="politeness">Politeness</option>
+      <option value="questions">Questions</option>
+      <option value="responses">Responses</option>
+      <option value="academic">Academic</option>
+      <option value="time">Time</option>
+      <option value="verbs">Verbs</option>
+      <option value="emotions">Emotions</option>
+      <option value="pronouns">People</option>
+      <option value="technology">Technology</option>
+      <option value="descriptors">Descriptors</option>
+      <option value="numbers">Numbers</option>
+    </select>
+  </div>
+
+  <div class="sp-browse-grid" id="browse-grid">
+    <!-- Populated by JS -->
+  </div>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: Phrasebook ─ user-saved signs                                     -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="tab-phrasebook" class="sp-panel" role="tabpanel" hidden>
+
+  <div class="sp-pb-header">
+    <h2 class="sp-pb-title">My Phrasebook</h2>
+    <p class="sp-pb-desc">Signs you've saved for quick reference. Tap any card to preview the sign.</p>
+  </div>
+
+  <div class="sp-pb-list" id="pb-list">
+    <!-- Populated by JS -->
+  </div>
+
+  <div class="sp-empty" id="pb-empty" style="display:none">
+    <div class="sp-empty-icon">📖</div>
+    <h3>Your phrasebook is empty</h3>
+    <p>Tap ⭐ on any sign in the Live or Browse tabs to save it here.</p>
+  </div>
+
+</section>
+
+<!-- ── About / credits footer ────────────────────────────────────────────── -->
+<footer class="sp-footer">
+  <p>SignBridge v1.0 — Part of <strong>LinguaBridge Academy</strong></p>
+  <p>For Deaf exchange students • ASL-inspired • All processing is local</p>
+  <p class="sp-footer-note">
+    Sign language animations are educational approximations, not a replacement for certified interpreters.
+  </p>
+</footer>
+
+<script src="sidepanel.js"></script>
+</body>
+</html>

@@ -8,7 +8,16 @@
     "start": "next start",
     "lint": "next lint",
     "backend": "php -S 127.0.0.1:8000 -t api/public api/router.php",
-    "backend:python": "uvicorn backend.main:app --reload --port 8000"
+    "backend:python": "uvicorn backend.main:app --reload --port 8000",
+    "test": "node --test tests/unit/sign-mapper.test.js tests/unit/vocab-10k.test.js tests/unit/signer2d.test.js",
+    "test:ext": "node --test tests/unit/sign-mapper.test.js tests/unit/vocab-10k.test.js tests/unit/signer2d.test.js",
+    "test:backend": ".venv/Scripts/python -m pytest tests/backend/ -v",
+    "test:ml": ".venv/Scripts/python -m pytest tests/ml/ -v",
+    "test:load": ".venv/Scripts/python -m pytest tests/load/ -v",
+    "test:perf": "node --test tests/perf/sign-mapper.perf.js",
+    "test:integration": "node --test tests/integration/pipeline.test.js",
+    "test:stress": "node --test tests/stress/sign-mapper.stress.js",
+    "test:all": "node --test tests/unit/sign-mapper.test.js tests/unit/vocab-10k.test.js tests/unit/signer2d.test.js tests/perf/sign-mapper.perf.js tests/integration/pipeline.test.js tests/stress/sign-mapper.stress.js && .venv/Scripts/python -m pytest tests/backend/ tests/ml/ tests/load/ -v"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.34",

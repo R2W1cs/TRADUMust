@@ -25,6 +25,46 @@ from pydantic import BaseModel
 from deep_translator import GoogleTranslator
 from textblob import TextBlob, Word
 
+# ── ML pipeline ───────────────────────────────────────────────────────────────
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from backend.ml.feature_extractor import extract_holistic_features
+from backend.ml.train   import load_trained_model, run_training
+
+import numpy as np
+
+# MediaPipe Holistic (lazy-loaded to avoid startup delay when not used)
+_mp_holistic  = None
+_mp_solutions = None
+
+def _get_mp_holistic():
+    """
+    Lazy-load MediaPipe Holistic.
+    Returns the holistic module on success, or None if unavailable.
+    mediapipe >= 0.10.9 removed the legacy solutions API — we fall back
+    gracefully to mock landmarks when it's missing.
+    """
+    global _mp_holistic, _mp_solutions
+    if _mp_holistic is None:
+        try:
+            import mediapipe as mp
+            import cv2 as _cv2  # noqa: F401 — verify opencv is present
+            _mp_solutions = getattr(mp, 'solutions', None)
+            if _mp_solutions is None or not hasattr(_mp_solutions, 'holistic'):
+                raise AttributeError("mediapipe.solutions.holistic not available")
+            _mp_holistic = _mp_solutions.holistic
+        except (ImportError, AttributeError):
+            _mp_holistic = False   # sentinel: tried but unavailable
+    return _mp_holistic if _mp_holistic is not False else None
+
+# Load trained model at startup (non-blocking — falls back to mock if missing)
+_ml_model   = None
+_ml_classes = None
+try:
+    _ml_model, _ml_classes = load_trained_model()
+except FileNotFoundError:
+    pass  # first run — train via POST /api/ml/train
+
 # ── App setup ────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="TRADUMUST API",
@@ -35,10 +75,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:1234",  # Next.js dev server (TRADUMUST)
-        "http://127.0.0.1:1234",
-        "http://localhost:3000",  # fallback
+        "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:1234",
+        "http://127.0.0.1:1234",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -69,13 +111,21 @@ class LandmarkRequest(BaseModel):
 
 
 class LandmarkResponse(BaseModel):
-    landmarks: list[dict]  # list of {x, y, z, visibility} for each of 21 hand keypoints
+    # Holistic output — separate arrays so classify can use all three
+    right_hand: list[dict]   # 21 landmarks {x,y,z} or []
+    left_hand:  list[dict]   # 21 landmarks {x,y,z} or []
+    pose:       list[dict]   # 33 landmarks {x,y,z} or []
     hand_detected: bool
     confidence: float
 
 
 class ClassifyRequest(BaseModel):
-    landmarks: list[dict]
+    # New holistic format (preferred)
+    right_hand: list[dict] = []   # 21 landmarks {x,y,z}
+    left_hand:  list[dict] = []   # 21 landmarks {x,y,z}
+    pose:       list[dict] = []   # 33 pose landmarks for normalization
+    # Legacy flat format (still accepted for backwards compatibility)
+    landmarks:  list[dict] = []   # old: flat 21-landmark list
 
 
 class ClassifyResponse(BaseModel):
@@ -254,9 +304,6 @@ def translate_text(req: TranslateRequest):
         # Fallback if connection fails
         translated = req.text
 
-    # Default to en for source if auto detected so cultural note lookup logic downstream won't crash
-    detected_source_display = detected_source if detected_source != "auto" else "en"
-
     # Cultural note for target language
     note_data = _CULTURAL_NOTES.get(target, _CULTURAL_NOTES["en"])
 
@@ -272,45 +319,56 @@ def translate_text(req: TranslateRequest):
 @app.post("/api/sign/extract-landmarks", response_model=LandmarkResponse, tags=["Sign Language"])
 def extract_landmarks(req: LandmarkRequest):
     """
-    Extract MediaPipe hand landmarks from a base64-encoded image frame.
+    Extract hand and body-pose landmarks from a base64-encoded image frame
+    using MediaPipe Holistic.
 
-    PRODUCTION SWAP:
-        import mediapipe as mp
-        import numpy as np
-        import cv2
+    Returns separate right_hand (21), left_hand (21), and pose (33) arrays
+    so the classify endpoint can use all three for production inference.
 
-        mp_hands = mp.solutions.hands
-        img_bytes = base64.b64decode(req.frame_b64)
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        with mp_hands.Hands(static_image_mode=True, max_num_hands=1) as hands:
-            results = hands.process(frame_rgb)
-            if results.multi_hand_landmarks:
-                lms = [{"x": lm.x, "y": lm.y, "z": lm.z, "visibility": 1.0}
-                       for lm in results.multi_hand_landmarks[0].landmark]
-                return LandmarkResponse(landmarks=lms, hand_detected=True, confidence=0.95)
-
-        return LandmarkResponse(landmarks=[], hand_detected=False, confidence=0.0)
+    Falls back to random mock landmarks if MediaPipe is not installed.
     """
-    # Validate base64 (minimal check)
     try:
         base64.b64decode(req.frame_b64, validate=True)
     except Exception:
         raise HTTPException(status_code=422, detail="frame_b64 is not valid base64")
 
-    # Mock: 21 landmark points with random normalized coordinates
-    mock_landmarks = [
-        {"x": round(random.uniform(0.3, 0.7), 4),
-         "y": round(random.uniform(0.2, 0.8), 4),
-         "z": round(random.uniform(-0.1, 0.1), 4),
-         "visibility": 1.0}
-        for _ in range(21)
-    ]
+    mp_holistic = _get_mp_holistic()
+
+    if mp_holistic is not None:
+        import cv2
+        img_bytes = base64.b64decode(req.frame_b64)
+        nparr     = np.frombuffer(img_bytes, np.uint8)
+        frame     = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(status_code=422, detail="Could not decode image from frame_b64")
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        def _lms(landmark_list):
+            return [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in landmark_list.landmark]
+
+        with mp_holistic.Holistic(static_image_mode=True, model_complexity=1) as holistic:
+            results = holistic.process(frame_rgb)
+
+        rh   = _lms(results.right_hand_landmarks) if results.right_hand_landmarks else []
+        lh   = _lms(results.left_hand_landmarks)  if results.left_hand_landmarks  else []
+        pose = _lms(results.pose_landmarks)        if results.pose_landmarks       else []
+
+        hand_detected = bool(rh or lh)
+        confidence    = 0.95 if hand_detected else 0.0
+
+        return LandmarkResponse(
+            right_hand=rh, left_hand=lh, pose=pose,
+            hand_detected=hand_detected, confidence=confidence,
+        )
+
+    # Fallback mock (MediaPipe not installed)
+    mock = [{"x": round(random.uniform(0.3, 0.7), 4),
+             "y": round(random.uniform(0.2, 0.8), 4),
+             "z": round(random.uniform(-0.05, 0.05), 4)}
+            for _ in range(21)]
 
     return LandmarkResponse(
-        landmarks=mock_landmarks,
+        right_hand=mock, left_hand=[], pose=[],
         hand_detected=True,
         confidence=round(random.uniform(0.80, 0.99), 2),
     )
@@ -319,41 +377,125 @@ def extract_landmarks(req: LandmarkRequest):
 @app.post("/api/sign/classify", response_model=ClassifyResponse, tags=["Sign Language"])
 def classify_sign(req: ClassifyRequest):
     """
-    Classify a sign gesture from MediaPipe landmarks.
+    Classify a sign gesture from MediaPipe Holistic landmarks.
 
-    PRODUCTION SWAP:
-        Load a trained TFLite / PyTorch model:
-            import numpy as np
-            import tflite_runtime.interpreter as tflite
+    Accepts either:
+    - New format: right_hand (21), left_hand (21), pose (33) — production path
+    - Legacy format: landmarks (21 flat list) — backwards compatible
 
-            interpreter = tflite.Interpreter(model_path="sign_classifier.tflite")
-            interpreter.allocate_tensors()
-            input_details = interpreter.get_input_details()
-            output_details = interpreter.get_output_details()
-
-            features = np.array([[lm["x"], lm["y"], lm["z"]] for lm in req.landmarks],
-                                 dtype=np.float32).flatten()
-            interpreter.set_tensor(input_details[0]["index"], [features])
-            interpreter.invoke()
-            output = interpreter.get_tensor(output_details[0]["index"])[0]
-            predicted_idx = int(np.argmax(output))
-            # map predicted_idx -> ASL gloss from your label list
+    Uses the trained model (RandomForest/XGBoost) with the 126-feature
+    normalized holistic feature vector. Falls back to mock if no model loaded.
     """
-    if not req.landmarks:
-        raise HTTPException(status_code=422, detail="landmarks list is empty")
+    has_holistic = bool(req.right_hand or req.left_hand)
+    has_legacy   = bool(req.landmarks)
 
-    predicted = random.choice(_MOCK_SIGNS)
-    confidence = round(random.uniform(0.72, 0.98), 2)
-    alternatives = [
-        {"sign": s, "confidence": round(random.uniform(0.05, 0.30), 2)}
-        for s in random.sample([s for s in _MOCK_SIGNS if s != predicted], k=3)
-    ]
+    if not has_holistic and not has_legacy:
+        raise HTTPException(status_code=422, detail="Provide right_hand/left_hand or landmarks")
+
+    predicted   = None
+    confidence  = 0.0
+    alternatives = []
+
+    if _ml_model is not None and _ml_classes is not None:
+        if has_holistic:
+            features = extract_holistic_features(
+                right_hand=req.right_hand or None,
+                left_hand=req.left_hand  or None,
+                pose=req.pose            or None,
+            ).reshape(1, -1)
+        else:
+            from backend.ml.feature_extractor import encode_landmarks_legacy
+            features = encode_landmarks_legacy(req.landmarks).reshape(1, -1)
+
+        try:
+            predicted_idx = int(_ml_model.predict(features)[0])
+            predicted     = _ml_classes[predicted_idx]
+            probas        = _ml_model.predict_proba(features)[0]
+            top_indices   = np.argsort(probas)[::-1]
+            confidence    = float(probas[predicted_idx])
+            alternatives  = [
+                {"sign": _ml_classes[i], "confidence": round(float(probas[i]), 4)}
+                for i in top_indices[1:4]
+            ]
+        except ValueError:
+            # Feature-count mismatch: model was trained on old 12-feature data.
+            # Retrain via POST /api/ml/train to get a 126-feature model.
+            predicted = None
+
+    if predicted is None:
+        predicted   = random.choice(_MOCK_SIGNS)
+        confidence  = round(random.uniform(0.72, 0.98), 2)
+        alternatives = [
+            {"sign": s, "confidence": round(random.uniform(0.05, 0.30), 2)}
+            for s in random.sample([s for s in _MOCK_SIGNS if s != predicted], k=3)
+        ]
 
     return ClassifyResponse(
         predicted_sign=predicted,
         confidence=confidence,
         alternatives=alternatives,
     )
+
+
+# ── ML training endpoints ─────────────────────────────────────────────────────
+
+class TrainRequest(BaseModel):
+    samples_per_sign: int = 150
+    n_folds: int = 5
+    kmeans_clusters: int = 20
+
+
+@app.post("/api/ml/train", tags=["ML"])
+def train_model(req: TrainRequest):
+    """
+    Train (or retrain) the sign classification model.
+
+    Runs the full pipeline:
+      1. Generate synthetic dataset from signs_data.json
+      2. Train KNN, RandomForest, SVM with 5-fold cross-validation
+      3. Run K-Means + PCA unsupervised analysis
+      4. Save the best model to trained_model.pkl
+      5. Save the full metrics report to training_report.json
+
+    Returns the full training report (accuracy, CV scores, cluster metrics, etc.)
+    """
+    global _ml_model, _ml_classes
+    try:
+        report = run_training(
+            samples_per_sign=req.samples_per_sign,
+            n_folds=req.n_folds,
+            kmeans_clusters=req.kmeans_clusters,
+            verbose=False,
+        )
+        # Reload the freshly trained model into memory
+        _ml_model, _ml_classes = load_trained_model()
+        return {"status": "ok", "report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {e}")
+
+
+@app.get("/api/ml/report", tags=["ML"])
+def get_ml_report():
+    """
+    Return the most recent training report (training_report.json).
+
+    Includes:
+      - Dataset statistics (samples, classes, features)
+      - Per-model cross-validation scores (accuracy, F1, overfit gap)
+      - Best model name and test accuracy
+      - K-Means cluster evaluation (ARI, NMI, purity)
+      - PCA explained variance
+      - Learning curve data
+    """
+    from backend.ml.train import REPORT_PATH
+    if not REPORT_PATH.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No training report found. POST /api/ml/train to train the model first.",
+        )
+    with open(REPORT_PATH, "r") as f:
+        report = json.load(f)
+    return report
 
 
 @app.post("/api/text-to-sign", response_model=TextToSignResponse, tags=["Sign Language"])
