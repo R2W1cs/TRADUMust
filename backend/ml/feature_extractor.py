@@ -28,13 +28,24 @@ import numpy as np
 
 # Number of hand landmarks (MediaPipe hand model)
 N_HAND_LANDMARKS = 21
+N_FACE_LANDMARKS = 20  # Selected landmarks for mouth and eyebrows
 N_HAND_FEATURES  = N_HAND_LANDMARKS * 3   # x, y, z per landmark = 63
-N_FEATURES       = N_HAND_FEATURES * 2    # right + left = 126
+N_FACE_FEATURES  = N_FACE_LANDMARKS * 3   # 60
+N_FEATURES       = (N_HAND_FEATURES * 2) + N_FACE_FEATURES # 126 + 60 = 186
 
 # MediaPipe pose landmark indices
 _POSE_LEFT_SHOULDER  = 11
 _POSE_RIGHT_SHOULDER = 12
 
+# MediaPipe face landmark indices (approximate indices for mouth and eyebrows)
+# Reference: https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
+FACE_LANDMARK_INDICES = [
+    # Mouth outer
+    61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 61,
+    # Eyebrows
+    70, 63, 105, 66, 107,  # Left
+    336, 296, 334, 293, 300 # Right
+]
 
 def _hand_to_array(landmarks: list[dict] | None) -> np.ndarray:
     """
@@ -51,6 +62,19 @@ def _hand_to_array(landmarks: list[dict] | None) -> np.ndarray:
     ).flatten()   # shape (63,)
     return arr
 
+def _face_to_array(landmarks: list[dict] | None) -> np.ndarray:
+    """
+    Extract specific face landmarks (mouth, eyebrows) into a flat array.
+    """
+    if not landmarks or len(landmarks) < 468: # Standard MediaPipe face mesh size
+        return np.zeros(N_FACE_FEATURES, dtype=np.float32)
+    
+    selected = []
+    for idx in FACE_LANDMARK_INDICES[:N_FACE_LANDMARKS]:
+        lm = landmarks[idx]
+        selected.append([lm.get('x', 0.0), lm.get('y', 0.0), lm.get('z', 0.0)])
+    
+    return np.array(selected, dtype=np.float32).flatten()
 
 def _pose_params(pose: list[dict]) -> tuple[np.ndarray, float] | None:
     """
@@ -75,10 +99,10 @@ def _pose_params(pose: list[dict]) -> tuple[np.ndarray, float] | None:
     return mid, width
 
 
-def _normalize_hand(arr: np.ndarray, mid: np.ndarray, width: float) -> np.ndarray:
-    """Center and scale a 63-dim hand array by shoulder pose parameters."""
+def _normalize_points(arr: np.ndarray, mid: np.ndarray, width: float) -> np.ndarray:
+    """Center and scale a flattened array of points (3D) by pose parameters."""
     out = arr.copy()
-    for i in range(0, N_HAND_FEATURES, 3):
+    for i in range(0, len(arr), 3):
         out[i]     = (arr[i]     - mid[0]) / width
         out[i + 1] = (arr[i + 1] - mid[1]) / width
         out[i + 2] = (arr[i + 2] - mid[2]) / width
@@ -89,70 +113,59 @@ def extract_holistic_features(
     right_hand: list[dict] | None,
     left_hand:  list[dict] | None,
     pose:       list[dict] | None = None,
+    face:       list[dict] | None = None,
 ) -> np.ndarray:
     """
-    Convert MediaPipe Holistic output to a normalized 126-feature vector.
+    Convert MediaPipe Holistic output to a normalized 186-feature vector.
 
     Parameters
     ----------
     right_hand : list of 21 dicts {x, y, z} or None
     left_hand  : list of 21 dicts {x, y, z} or None
     pose       : list of 33 dicts {x, y, z} or None (used for normalization)
+    face       : list of 468+ dicts {x, y, z} or None
 
     Returns
     -------
-    np.ndarray shape (126,), dtype float32
-        [0:63]   right-hand landmarks (x,y,z × 21), normalized
-        [63:126] left-hand landmarks  (x,y,z × 21), normalized
-        Missing hand → zero block for that half (NOT normalized)
-
-    Note: normalization is applied independently per hand and only when
-    the hand is actually present. Missing-hand zero blocks are never
-    transformed, so they remain invariant to pose parameters.
+    np.ndarray shape (186,), dtype float32
+        [0:63]    right-hand landmarks, normalized
+        [63:126]  left-hand landmarks, normalized
+        [126:186] face landmarks (mouth/eyebrows), normalized
     """
     rh_present = bool(right_hand and len(right_hand) >= N_HAND_LANDMARKS)
     lh_present = bool(left_hand  and len(left_hand)  >= N_HAND_LANDMARKS)
+    face_present = bool(face and len(face) >= 468)
 
     rh = _hand_to_array(right_hand)
     lh = _hand_to_array(left_hand)
+    fa = _face_to_array(face)
 
-    # Apply pose normalization only to present hands
+    # Apply pose normalization
     params = _pose_params(pose) if pose else None
     if params is not None:
         mid, width = params
         if rh_present:
-            rh = _normalize_hand(rh, mid, width)
+            rh = _normalize_points(rh, mid, width)
         if lh_present:
-            lh = _normalize_hand(lh, mid, width)
+            lh = _normalize_points(lh, mid, width)
+        if face_present:
+            fa = _normalize_points(fa, mid, width)
 
-    return np.concatenate([rh, lh]).astype(np.float32)
+    return np.concatenate([rh, lh, fa]).astype(np.float32)
 
 
 def pool_frame_sequence(frames: list[np.ndarray]) -> np.ndarray:
     """
     Temporal aggregation: reduce a variable-length sequence of per-frame
-    feature vectors to a fixed-length 252-feature representation.
-
-    Method: concatenate [mean, std] across frames — captures both the
-    average pose (WHAT sign) and the spread/motion (HOW it moves).
-
-    Parameters
-    ----------
-    frames : list of np.ndarray, each shape (126,)
-        Per-frame features extracted by extract_holistic_features().
-        Should be 8–32 frames (0.25–1.0 s at 30 fps).
-
-    Returns
-    -------
-    np.ndarray shape (252,), dtype float32
+    feature vectors to a fixed-length (N_FEATURES * 2) representation.
     """
     if not frames:
         return np.zeros(N_FEATURES * 2, dtype=np.float32)
 
-    mat = np.stack(frames, axis=0)   # (n_frames, 126)
-    mean = mat.mean(axis=0)          # (126,)
-    std  = mat.std(axis=0)           # (126,)
-    return np.concatenate([mean, std]).astype(np.float32)   # (252,)
+    mat = np.stack(frames, axis=0)   # (n_frames, 186)
+    mean = mat.mean(axis=0)          # (186,)
+    std  = mat.std(axis=0)           # (186,)
+    return np.concatenate([mean, std]).astype(np.float32)   # (372,)
 
 
 def encode_landmarks_legacy(landmarks: list[dict]) -> np.ndarray:

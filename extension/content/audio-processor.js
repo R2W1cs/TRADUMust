@@ -128,6 +128,10 @@
 
       if (captionText && captionText !== this._lastText) {
         this._emitText(captionText, true);
+      } else if (!captionText && this._strategy === 'none') {
+        // Debug: log which selectors were tried so the Teams DOM can be inspected
+        const tried = selectors.map(s => `"${s}" → ${document.querySelectorAll(s).length}`).join(', ');
+        console.debug('[SignBridge] Polling Teams DOM — no captions yet. Tried:', tried);
       }
     },
 
@@ -141,13 +145,35 @@
       }
 
       this._strategy = 'speech';
+
+      // _running prevents the double-start that causes InvalidStateError.
+      // Both onerror AND onend fire after an error; using a single restart
+      // path (onend only) with this guard keeps exactly one live recogniser.
+      let _running   = false;
+      let _lastError = null;
+
+      const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed']);
+
       const rec = new SpeechRecognition();
-      rec.continuous    = true;
-      rec.interimResults = true;
-      rec.lang          = navigator.language || 'en-US';
+      rec.continuous      = true;
+      rec.interimResults  = true;
+      rec.lang            = navigator.language || 'en-US';
       rec.maxAlternatives = 1;
 
+      const tryStart = () => {
+        if (!this._active || this._strategy !== 'speech' || _running) return;
+        try {
+          rec.start();
+          _running = true;
+        } catch (err) {
+          // Should not happen with the _running guard, but swallow just in case.
+          console.warn('[SignBridge] SpeechRecognition start error:', err.message);
+        }
+      };
+
       rec.onstart = () => {
+        _running    = true;
+        _lastError  = null;
         console.log('[SignBridge] Web Speech API started (microphone)');
       };
 
@@ -173,31 +199,39 @@
       };
 
       rec.onerror = (event) => {
-        // 'no-speech' is expected when the user is quiet — don't warn
+        _lastError = event.error;
+        _running   = false;   // mark stopped so onend can restart safely
+
         if (event.error !== 'no-speech') {
           console.warn('[SignBridge] SpeechRecognition error:', event.error);
         }
-        // Restart automatically after network/audio errors (not permission errors)
-        if (event.error !== 'not-allowed' && event.error !== 'service-not-allowed') {
-          setTimeout(() => {
-            if (this._active && this._strategy === 'speech') {
-              rec.start();
-            }
-          }, 1000);
-        }
+        // Do NOT restart here — onend always fires after onerror and is the
+        // single restart point. Restarting from both handlers is what causes
+        // the InvalidStateError race.
       };
 
       rec.onend = () => {
-        // Continuously restart if still active
-        if (this._active && this._strategy === 'speech') {
-          setTimeout(() => {
-            try { rec.start(); } catch { /* already started */ }
-          }, 200);
+        _running = false;
+
+        // Stop permanently on fatal / permission errors
+        if (FATAL_ERRORS.has(_lastError)) {
+          console.warn('[SignBridge] Microphone permission denied — speech recognition disabled.');
+          return;
         }
+
+        // Don't restart if AudioProcessor.stop() was called (sets _active=false
+        // and _strategy='none' before rec.stop(), so 'aborted' is handled here).
+        if (!this._active || this._strategy !== 'speech') return;
+
+        // Brief pause before restart: longer after an aborted/network error
+        // so the browser has time to fully release the audio device.
+        const delay = (_lastError && _lastError !== 'no-speech') ? 600 : 200;
+        setTimeout(tryStart, delay);
       };
 
       try {
         rec.start();
+        _running          = true;
         this._recognition = rec;
       } catch (err) {
         console.warn('[SignBridge] Could not start SpeechRecognition:', err.message);

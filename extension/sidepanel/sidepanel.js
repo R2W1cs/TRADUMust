@@ -303,10 +303,26 @@ async function saveToPhrasebook(key) {
   if (btn) {
     btn.textContent = '✓ Saved';
     btn.classList.add('saved');
+    showCelebration(); // Elite Sandbox Polish
     setTimeout(() => {
       btn.textContent = '⭐ Save';
       btn.classList.remove('saved');
     }, 2000);
+  }
+}
+
+function showCelebration() {
+  const root = document.getElementById('tab-live');
+  const colors = ['#818cf8', '#7dd3fc', '#34d399', '#fbbf24'];
+  
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'sp-confetti';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (Math.random() * 0.5 + 0.5) + 's';
+    root.appendChild(p);
+    setTimeout(() => p.remove(), 1000);
   }
 }
 

@@ -34,6 +34,15 @@ export interface HistoryEntry {
   sentiment: SignSentiment | null;
   metadata: SignMetadata[];
   wordSequence: string[];
+  extra: {
+    word_sequence?: string[];
+    srs?: {
+      interval: number;
+      easiness: number;
+      repetitions: number;
+      next_review?: number;
+    };
+  };
 }
 
 export interface TranslateResponse extends TranslationResult {
@@ -129,3 +138,18 @@ export function createTextToSign(payload: { text: string; sign_language: string 
     body: JSON.stringify(payload),
   });
 }
+
+export function saveRecognizedSign(payload: { text: string; sign_language: string }) {
+  return apiFetch<{ status: string; history_entry: HistoryEntry }>("/api/sign/save-recognition", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchPhrasebookSrs(entryId: string, extra: any) {
+  return apiFetch<{ entry: HistoryEntry }>(`/api/phrasebook/${entryId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ extra }),
+  });
+}
+

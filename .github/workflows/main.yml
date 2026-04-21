@@ -1,1 +1,48 @@
+name: TraduMust CI
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Node.js Unit Tests
+        run: npm run test
+
+      - name: Run Backend API Tests
+        run: |
+          # We need to simulate the windows path for the script or use the direct pytest command
+          pytest tests/backend/test_api.py -v
+
+      - name: Run ML Pipeline Tests
+        run: pytest tests/ml/ -v
+
+      - name: Run Integration Tests
+        run: npm run test:integration

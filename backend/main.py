@@ -14,7 +14,9 @@ from __future__ import annotations
 import base64
 import random
 import time
-from typing import Literal
+import uuid
+from typing import Any, Literal
+from collections import OrderedDict
 
 import asyncio
 import json
@@ -57,19 +59,12 @@ def _get_mp_holistic():
             _mp_holistic = False   # sentinel: tried but unavailable
     return _mp_holistic if _mp_holistic is not False else None
 
-# Load trained model at startup (non-blocking — falls back to mock if missing)
-_ml_model   = None
-_ml_classes = None
-try:
-    _ml_model, _ml_classes = load_trained_model()
-except FileNotFoundError:
-    pass  # first run — train via POST /api/ml/train
-
 # ── App setup ────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="TRADUMUST API",
     description="Translation, cultural context, and sign-language bridge endpoints.",
     version="0.1.0",
+    mode="MVP (mock data — swap in real APIs for production)",
 )
 
 app.add_middleware(
@@ -87,20 +82,102 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Load trained model at startup (non-blocking — falls back to mock if missing)
+_ml_model   = None
+_ml_classes = None
+_lstm_model = None
+
+@app.on_event("startup")
+def load_model():
+    global _ml_model, _ml_classes, _lstm_model
+    try:
+        from backend.ml.train import load_trained_model, LSTM_PATH
+        from backend.ml.lstm_model import SignLanguageLSTM
+        import torch
+        
+        _ml_model, _ml_classes = load_trained_model()
+        
+        if LSTM_PATH.exists():
+            _lstm_model = SignLanguageLSTM(input_size=186, num_classes=len(_ml_classes))
+            _lstm_model.load_state_dict(torch.load(LSTM_PATH, map_location='cpu'))
+            _lstm_model.eval()
+            print("OK LSTM model loaded")
+            
+    except Exception as e:
+        print(f"DEBUG: Startup model loading info: {e}")
+
+# ── In-memory history & phrasebook store ─────────────────────────────────────
+# Keyed by entry id (32-char hex). OrderedDict preserves insertion order.
+# Persisted to backend/data/history.json to survive hot-reloads.
+HISTORY_FILE = os.path.join(os.path.dirname(__file__), "data", "history.json")
+
+def _load_history_store() -> OrderedDict[str, dict]:
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                pairs = json.load(f)
+                return OrderedDict(pairs)
+        except Exception as e:
+            print(f"DEBUG: Could not load persistence file: {e}")
+    return OrderedDict()
+
+_history_store: OrderedDict[str, dict] = _load_history_store()
+
+def _save_history_store():
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            # Save as list of [id, entry] pairs to preserve OrderedDict order in JSON
+            json.dump(list(_history_store.items()), f, indent=2)
+    except Exception as e:
+        print(f"DEBUG: Could not save persistence file: {e}")
+
+
+def _make_entry(
+    entry_type: str,
+    source: str,
+    source_lang: str | None,
+    target_lang: str | None,
+    sign_language: str | None,
+    result: dict,
+    sentiment: dict | None = None,
+    metadata: list | None = None,
+    word_sequence: list | None = None,
+    extra: dict | None = None,
+) -> dict:
+    """Create and persist a new history entry, returned as a plain dict."""
+    entry_id = uuid.uuid4().hex  # 32 hex chars
+    ts = int(time.time())
+    entry: dict[str, Any] = {
+        "id": entry_id,
+        "entry_type": entry_type,
+        "source": source,
+        "sourceLang": source_lang,
+        "targetLang": target_lang,
+        "signLanguage": sign_language,
+        "timestamp": ts,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)),
+        "isPhrasebook": False,
+        "result": result,
+        "sentiment": sentiment,
+        "metadata": metadata or [],
+        "wordSequence": word_sequence or [],
+        "extra": extra or {},
+    }
+    _history_store[entry_id] = entry
+    # Keep at most 500 entries to avoid unbounded memory growth
+    while len(_history_store) > 500:
+        _history_store.popitem(last=False)
+    
+    _save_history_store()
+    return entry
+
+
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
 
 class TranslateRequest(BaseModel):
     text: str
     source_lang: str = "auto"
     target_lang: str = "fr"
-
-
-class TranslateResponse(BaseModel):
-    translated_text: str
-    cultural_note: str
-    formality_level: Literal["formal", "informal", "neutral"]
-    regional_variant: str
-    source_lang_detected: str
 
 
 class LandmarkRequest(BaseModel):
@@ -115,6 +192,7 @@ class LandmarkResponse(BaseModel):
     right_hand: list[dict]   # 21 landmarks {x,y,z} or []
     left_hand:  list[dict]   # 21 landmarks {x,y,z} or []
     pose:       list[dict]   # 33 landmarks {x,y,z} or []
+    face:       list[dict]   # 468 landmarks {x,y,z} or []
     hand_detected: bool
     confidence: float
 
@@ -124,6 +202,7 @@ class ClassifyRequest(BaseModel):
     right_hand: list[dict] = []   # 21 landmarks {x,y,z}
     left_hand:  list[dict] = []   # 21 landmarks {x,y,z}
     pose:       list[dict] = []   # 33 pose landmarks for normalization
+    face:       list[dict] = []   # 468+ face landmarks
     # Legacy flat format (still accepted for backwards compatibility)
     landmarks:  list[dict] = []   # old: flat 21-landmark list
 
@@ -139,13 +218,9 @@ class TextToSignRequest(BaseModel):
     sign_language: str = "ASL"
 
 
-class TextToSignResponse(BaseModel):
-    sign_language: str
-    word_sequence: list[str]           # words to animate in order
-    fingerspell_fallback: list[str]    # words with no known sign gloss -> fingerspell
-    animation_clips: list[dict]        # [{"word": "hello", "clip_url": "/clips/hello.glb"}]
-    sentiment: dict                    # {"polarity": 0.x, "subjectivity": 0.x}
-    syntactic_metadata: list[dict]      # [{"word": "HELLO", "tag": "TIME"}]
+class SaveRecognitionRequest(BaseModel):
+    text: str
+    sign_language: str = "ASL"
 
 
 # ── Mock data ─────────────────────────────────────────────────────────────────
@@ -276,10 +351,10 @@ def health_check():
     }
 
 
-@app.post("/api/translate", response_model=TranslateResponse, tags=["Translation"])
+@app.post("/api/translate", tags=["Translation"])
 def translate_text(req: TranslateRequest):
     """
-    Translate text and return cultural context.
+    Translate text and return cultural context + a persisted history entry.
 
     PRODUCTION SWAP:
         Replace the mock lookup below with a call to LibreTranslate:
@@ -300,32 +375,38 @@ def translate_text(req: TranslateRequest):
 
     try:
         translated = GoogleTranslator(source=detected_source, target=target).translate(req.text)
-    except Exception as e:
+    except Exception:
         # Fallback if connection fails
         translated = req.text
 
     # Cultural note for target language
     note_data = _CULTURAL_NOTES.get(target, _CULTURAL_NOTES["en"])
 
-    return TranslateResponse(
-        translated_text=translated,
-        cultural_note=note_data["cultural_note"],
-        formality_level=note_data["formality_level"],  # type: ignore[arg-type]
-        regional_variant=note_data["regional_variant"],
-        source_lang_detected=detected_source,
+    result = {
+        "translated_text": translated,
+        "cultural_note": note_data["cultural_note"],
+        "formality_level": note_data["formality_level"],
+        "regional_variant": note_data["regional_variant"],
+        "source_lang_detected": detected_source,
+        "formality_detail": None,
+    }
+
+    entry = _make_entry(
+        entry_type="translation",
+        source=req.text,
+        source_lang=detected_source,
+        target_lang=target,
+        sign_language=None,
+        result=result,
     )
+
+    return {**result, "history_entry": entry}
 
 
 @app.post("/api/sign/extract-landmarks", response_model=LandmarkResponse, tags=["Sign Language"])
 def extract_landmarks(req: LandmarkRequest):
     """
-    Extract hand and body-pose landmarks from a base64-encoded image frame
-    using MediaPipe Holistic.
-
-    Returns separate right_hand (21), left_hand (21), and pose (33) arrays
-    so the classify endpoint can use all three for production inference.
-
-    Falls back to random mock landmarks if MediaPipe is not installed.
+    Extract hand, body-pose, and face landmarks from a base64-encoded image frame.
     """
     try:
         base64.b64decode(req.frame_b64, validate=True)
@@ -344,70 +425,59 @@ def extract_landmarks(req: LandmarkRequest):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         def _lms(landmark_list):
+            if not landmark_list: return []
             return [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in landmark_list.landmark]
 
         with mp_holistic.Holistic(static_image_mode=True, model_complexity=1) as holistic:
             results = holistic.process(frame_rgb)
 
-        rh   = _lms(results.right_hand_landmarks) if results.right_hand_landmarks else []
-        lh   = _lms(results.left_hand_landmarks)  if results.left_hand_landmarks  else []
-        pose = _lms(results.pose_landmarks)        if results.pose_landmarks       else []
+        rh   = _lms(results.right_hand_landmarks)
+        lh   = _lms(results.left_hand_landmarks)
+        pose = _lms(results.pose_landmarks)
+        face = _lms(results.face_landmarks)
 
         hand_detected = bool(rh or lh)
         confidence    = 0.95 if hand_detected else 0.0
 
         return LandmarkResponse(
-            right_hand=rh, left_hand=lh, pose=pose,
+            right_hand=rh, left_hand=lh, pose=pose, face=face,
             hand_detected=hand_detected, confidence=confidence,
         )
 
-    # Fallback mock (MediaPipe not installed)
-    mock = [{"x": round(random.uniform(0.3, 0.7), 4),
-             "y": round(random.uniform(0.2, 0.8), 4),
-             "z": round(random.uniform(-0.05, 0.05), 4)}
-            for _ in range(21)]
-
     return LandmarkResponse(
-        right_hand=mock, left_hand=[], pose=[],
-        hand_detected=True,
-        confidence=round(random.uniform(0.80, 0.99), 2),
+        right_hand=[], left_hand=[], pose=[], face=[],
+        hand_detected=False, confidence=0.0,
     )
 
 
 @app.post("/api/sign/classify", response_model=ClassifyResponse, tags=["Sign Language"])
 def classify_sign(req: ClassifyRequest):
     """
-    Classify a sign gesture from MediaPipe Holistic landmarks.
-
-    Accepts either:
-    - New format: right_hand (21), left_hand (21), pose (33) — production path
-    - Legacy format: landmarks (21 flat list) — backwards compatible
-
-    Uses the trained model (RandomForest/XGBoost) with the 126-feature
-    normalized holistic feature vector. Falls back to mock if no model loaded.
+    Classify a sign gesture using either the Classic Sklearn model or the new LSTM PyTorch model.
     """
-    has_holistic = bool(req.right_hand or req.left_hand)
-    has_legacy   = bool(req.landmarks)
-
-    if not has_holistic and not has_legacy:
-        raise HTTPException(status_code=422, detail="Provide right_hand/left_hand or landmarks")
-
+    global _ml_model, _ml_classes
+    
+    # In a real scenario, we might receive a sequence of frames. 
+    # For this endpoint, we'll handle the single-frame classification using the best available model.
+    
     predicted   = None
     confidence  = 0.0
     alternatives = []
 
+    # Check if we have an LSTM model (requires sequences, but we can mock a sequence of 1 for now)
+    # or use the classic model on a single frame.
+    
     if _ml_model is not None and _ml_classes is not None:
-        if has_holistic:
-            features = extract_holistic_features(
-                right_hand=req.right_hand or None,
-                left_hand=req.left_hand  or None,
-                pose=req.pose            or None,
-            ).reshape(1, -1)
-        else:
-            from backend.ml.feature_extractor import encode_landmarks_legacy
-            features = encode_landmarks_legacy(req.landmarks).reshape(1, -1)
+        features = extract_holistic_features(
+            right_hand=req.right_hand or None,
+            left_hand=req.left_hand  or None,
+            pose=req.pose            or None,
+            face=req.face            or None,
+        ).reshape(1, -1)
 
         try:
+            # For now, we still use the classic model for the single-frame endpoint
+            # but it now uses the 186-dim feature vector.
             predicted_idx = int(_ml_model.predict(features)[0])
             predicted     = _ml_classes[predicted_idx]
             probas        = _ml_model.predict_proba(features)[0]
@@ -417,9 +487,7 @@ def classify_sign(req: ClassifyRequest):
                 {"sign": _ml_classes[i], "confidence": round(float(probas[i]), 4)}
                 for i in top_indices[1:4]
             ]
-        except ValueError:
-            # Feature-count mismatch: model was trained on old 12-feature data.
-            # Retrain via POST /api/ml/train to get a 126-feature model.
+        except Exception:
             predicted = None
 
     if predicted is None:
@@ -498,12 +566,12 @@ def get_ml_report():
     return report
 
 
-@app.post("/api/text-to-sign", response_model=TextToSignResponse, tags=["Sign Language"])
+@app.post("/api/text-to-sign", tags=["Sign Language"])
 def text_to_sign(req: TextToSignRequest):
     """
     Convert text to a sequence of ASL sign animation triggers.
 
-    Returns word-level sign gloss and flags words that need fingerspelling.
+    Returns word-level sign gloss, fingerspelling flags, and a persisted history entry.
 
     PRODUCTION SWAP:
         Use a sign language lexicon / gloss dictionary to map English words to ASL glosses.
@@ -514,7 +582,7 @@ def text_to_sign(req: TextToSignRequest):
         raise HTTPException(status_code=422, detail="text field must not be empty")
 
     blob = TextBlob(req.text)
-    
+
     # 1. Sentiment Analysis
     sentiment = {
         "polarity": round(blob.sentiment.polarity, 2),
@@ -524,13 +592,13 @@ def text_to_sign(req: TextToSignRequest):
     # 2. Advanced ASL Glossing Logic
     # ASL Structure Target: TIME + SUBJECT + OBJECT + VERB
     # We use POS tags: NN (Noun), VB (Verb), JJ (Adj), RB (Adv), PRP (Pronoun), etc.
-    
+
     tags = blob.tags
-    time_words = []
-    subjects = []
-    objects = []
-    verbs = []
-    others = []
+    time_words: list[dict] = []
+    subjects:   list[dict] = []
+    objects:    list[dict] = []
+    verbs:      list[dict] = []
+    others:     list[dict] = []
 
     time_keywords = {"tomorrow", "yesterday", "today", "now", "soon", "later", "morning", "night"}
 
@@ -549,15 +617,15 @@ def text_to_sign(req: TextToSignRequest):
         elif "VB" in tag:
             verbs.append({"word": upper_lemma, "tag": "ACTION"})
         else:
-            if upper_lemma not in ["A", "AN", "THE", "AM", "IS", "ARE", "BE"]: # Filter Basic Stopwords
+            if upper_lemma not in ["A", "AN", "THE", "AM", "IS", "ARE", "BE"]:
                 others.append({"word": upper_lemma, "tag": "MODIFIER"})
 
     # Reconstruct in ASL logic order
     ordered_metadata = time_words + subjects + objects + verbs + others
-    
+
     # Filter uniques while preserving order
-    unique_meta = []
-    seen = set()
+    unique_meta: list[dict] = []
+    seen: set[str] = set()
     for item in ordered_metadata:
         if item["word"] not in seen:
             unique_meta.append(item)
@@ -577,14 +645,68 @@ def text_to_sign(req: TextToSignRequest):
         for item in unique_meta
     ]
 
-    return TextToSignResponse(
+    entry = _make_entry(
+        entry_type="sign_expression",
+        source=req.text,
+        source_lang=None,
+        target_lang=None,
         sign_language=req.sign_language,
-        word_sequence=word_sequence,
-        fingerspell_fallback=fingerspell_fallback,
-        animation_clips=animation_clips,
+        result={
+            "translated_text": " ".join(word_sequence),
+            "cultural_note": "",
+            "formality_level": "neutral",
+            "regional_variant": "",
+        },
         sentiment=sentiment,
-        syntactic_metadata=unique_meta
+        metadata=unique_meta,
+        word_sequence=word_sequence,
+        extra={"word_sequence": word_sequence},
     )
+
+    return {
+        "sign_language": req.sign_language,
+        "word_sequence": word_sequence,
+        "fingerspell_fallback": fingerspell_fallback,
+        "animation_clips": animation_clips,
+        "sentiment": sentiment,
+        "syntactic_metadata": unique_meta,
+        "history_entry": entry,
+    }
+
+
+@app.post("/api/sign/save-recognition", tags=["Sign Language"])
+def save_recognition(req: SaveRecognitionRequest):
+    """
+    Persist a recognized sign sequence into history.
+    This allows recognized phrases to be added to the phrasebook.
+    """
+    if not req.text.strip():
+        raise HTTPException(status_code=422, detail="text field must not be empty")
+
+    words = req.text.upper().replace(",", "").replace(".", "").replace("?", "").split()
+
+    # Simple mock metadata for recognition entries
+    unique_meta = [{"word": w, "tag": "RECOGNIZED"} for w in words]
+
+    entry = _make_entry(
+        entry_type="sign_expression",  # Use sign_expression to be compatible with signs tab
+        source=req.text,
+        source_lang=None,
+        target_lang=None,
+        sign_language=req.sign_language,
+        result={
+            "translated_text": req.text,
+            "cultural_note": "Persisted from AI Sign Recognition.",
+            "formality_level": "neutral",
+            "regional_variant": "",
+        },
+        sentiment={"polarity": 0.0, "subjectivity": 0.0},
+        metadata=unique_meta,
+        word_sequence=words,
+        extra={"word_sequence": words},
+    )
+
+    return {"status": "saved", "history_id": entry["id"], "history_entry": entry}
 
 
 @app.get("/api/cultural-notes/{lang}", tags=["Translation"])
@@ -778,3 +900,64 @@ async def websocket_sign(ws: WebSocket):
 
     except WebSocketDisconnect:
         manager.disconnect(ws)
+
+@app.get("/api/history", tags=["History"])
+def get_history(entry_type: str | None = None, limit: int = 10):
+    """
+    Return history entries from the in-memory store, newest first.
+    Optionally filter by entry_type ('translation' or 'sign_expression').
+    """
+    entries = list(reversed(list(_history_store.values())))
+    if entry_type:
+        entries = [e for e in entries if e["entry_type"] == entry_type]
+    return {"data": entries[:limit]}
+
+
+# ── Phrasebook endpoints ───────────────────────────────────────────────────────
+
+@app.get("/api/phrasebook", tags=["Phrasebook"])
+def get_phrasebook(limit: int = 100):
+    """Return all phrasebook-flagged history entries, newest first."""
+    entries = [
+        e for e in reversed(list(_history_store.values()))
+        if e.get("isPhrasebook")
+    ]
+    return {"data": entries[:limit]}
+
+
+@app.post("/api/phrasebook", tags=["Phrasebook"])
+def save_phrasebook(payload: dict):
+    """Mark an existing history entry as a phrasebook item."""
+    history_id = str(payload.get("history_id", "")).strip()
+    if not history_id:
+        raise HTTPException(status_code=422, detail="A history_id is required to save a phrase.")
+    entry = _history_store.get(history_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"History entry '{history_id}' not found.")
+    entry["isPhrasebook"] = True
+    _save_history_store()
+    return {"entry": entry}
+
+
+@app.delete("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
+def delete_phrasebook(entry_id: str):
+    """Remove the phrasebook flag from a history entry."""
+    entry = _history_store.get(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"Entry '{entry_id}' not found.")
+    entry["isPhrasebook"] = False
+    _save_history_store()
+    return {"deleted": True}
+
+
+@app.patch("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
+def patch_phrasebook_srs(entry_id: str, payload: dict):
+    """Update the SRS extra data on a phrasebook entry."""
+    entry = _history_store.get(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"Entry '{entry_id}' not found.")
+    extra = entry.get("extra", {})
+    extra.update(payload.get("extra", {}))
+    entry["extra"] = extra
+    _save_history_store()
+    return {"entry": entry}

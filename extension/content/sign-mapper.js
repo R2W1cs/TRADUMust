@@ -2831,9 +2831,9 @@
               cfg._key = WORD_TO_SIGN[stemKey];
               signs.push(cfg);
             } else {
-              // Step 3: extended vocab (lazy-loaded vocab-10k.js)
+              // Step 3: extended vocab (lazy-loaded vocab-10k.json)
               this._loadExtVocab();
-              const extVocab = window.SignBridge.VOCAB_EXT;
+              const extVocab = this._extVocab;
               const extKey = extVocab && (extVocab[word] || extVocab[stemmed]);
               if (extKey && SIGNS[extKey]) {
                 const cfg = { ...SIGNS[extKey] };
@@ -2915,14 +2915,18 @@
     _loadExtVocab() {
       if (this._extVocabLoaded || this._extVocabLoading) return;
       this._extVocabLoading = true;
-      try {
-        const url = chrome.runtime.getURL('content/vocab-10k.js');
-        const s = document.createElement('script');
-        s.src = url;
-        s.onload  = () => { this._extVocabLoaded = true; this._extVocabLoading = false; };
-        s.onerror = () => { this._extVocabLoading = false; };
-        (document.head || document.documentElement).appendChild(s);
-      } catch (_) { this._extVocabLoading = false; }
+      const url = chrome.runtime.getURL('content/vocab-10k.json');
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          this._extVocab = data;
+          this._extVocabLoaded = true;
+          this._extVocabLoading = false;
+        })
+        .catch(err => {
+          console.error('[SignBridge] Failed to load extended vocab:', err);
+          this._extVocabLoading = false;
+        });
     },
 
     /**

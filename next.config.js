@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const apiProxyOrigin = process.env.NEXT_PUBLIC_API_PROXY_TARGET || "http://127.0.0.1:8000";
+const apiProxyOrigin = process.env.NEXT_PUBLIC_API_PROXY_TARGET || "http://127.0.0.1:8001";
 
 const nextConfig = {
   // In development the frontend proxies relative /api requests to the PHP service.

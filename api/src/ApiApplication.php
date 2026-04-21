@@ -129,6 +129,14 @@ final class ApiApplication
             ], 200, (string) $this->config['frontend_url']);
         }
 
+        if ($method === 'PATCH' && preg_match('#^/api/phrasebook/([a-f0-9]{32})$#', $path, $matches) === 1) {
+            $payload = $this->readJsonBody();
+            $entry = $this->historyRepository->updateExtraJson($matches[1], $payload['extra'] ?? []);
+            JsonResponse::send([
+                'entry' => $entry,
+            ], 200, (string) $this->config['frontend_url']);
+        }
+
         if ($method === 'GET' && preg_match('#^/api/cultural-notes/([a-z]{2})$#', $path, $matches) === 1) {
             JsonResponse::send(
                 $this->notesService->getDetailedNote($matches[1]),

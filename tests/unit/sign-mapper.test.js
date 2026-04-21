@@ -31,7 +31,7 @@ const ctx = {
   console,
 };
 vm.createContext(ctx);
-vm.runInContext(code, ctx);
+vm.runInContext(code, ctx, { filename: MAPPER_PATH });
 
 const SM = ctx.window.SignBridge.SignMapper;
 

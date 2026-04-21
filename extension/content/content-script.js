@@ -22,14 +22,45 @@
 (function () {
   'use strict';
 
-  // Guard: don't run on non-video pages (YouTube home, etc.)
-  const SB = window.SignBridge;
-  if (!SB) { console.error('[SignBridge] Modules not loaded'); return; }
+  // Guard: wait for modules to satisfy Isolated World execution
+  let SB = window.SignBridge;
+  
+  async function ensureModules() {
+    let retries = 5;
+    while (!SB && retries > 0) {
+      console.debug(`[SignBridge] Waiting for modules... (${retries} left)`);
+      await new Promise(r => setTimeout(r, 200));
+      SB = window.SignBridge;
+      retries--;
+    }
+  }
 
-  const { PlatformDetector, StorageManager, SignMapper, AudioProcessor, AvatarOverlay } = SB;
+  async function boot() {
+    await ensureModules();
+    if (!SB || !SB.PlatformDetector) {
+      console.error('[SignBridge] Core modules failed to load. Extension disabled.');
+      return;
+    }
 
-  const platform = PlatformDetector.detect();
-  console.log(`[SignBridge] Active on ${PlatformDetector.getDisplayName()} (${platform})`);
+    // Assign to outer scope
+    platform = SB.PlatformDetector.detect();
+    StorageManager = SB.StorageManager;
+    SignMapper = SB.SignMapper;
+    AudioProcessor = SB.AudioProcessor;
+    AvatarOverlay = SB.AvatarOverlay;
+
+    console.log(`[SignBridge] Active on ${SB.PlatformDetector.getDisplayName() || 'Unknown'} (${platform})`);
+    
+    // Auto-init for supported environments
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      init();
+    } else {
+      document.addEventListener('DOMContentLoaded', init);
+    }
+  }
+
+  let platform = 'unknown'; // placeholder, set in boot()
+  let StorageManager, SignMapper, AudioProcessor, AvatarOverlay; // extracted in boot()
 
   let initialized   = false;
   let captureActive = false;
@@ -131,28 +162,46 @@
   }
 
   // ── Text → signs pipeline ─────────────────────────────────────────────────
+  let lastProcessedText = '';
+
   function onTextReceived(text, isFinal) {
     if (!text || text.trim().length < 2) return;
 
-    // Update the caption display with raw text
+    // Update the caption display with raw text (Elite UI handles the tracking bubble)
     AvatarOverlay.updateCaption(text);
 
-    // Only process final transcriptions for sign animation
-    // (interim results are too unstable for sign queuing)
-    if (!isFinal) return;
+    // REAL-TIME STREAMING LOGIC
+    // We compare the current (interim or final) text with the last processed text
+    // and extract only the new words to avoid repeating signs.
+    let newText = '';
+    if (isFinal) {
+      // For final results, we take everything that wasn't in the last final chunk
+      newText = text;
+      lastProcessedText = ''; // Reset for next utterance
+    } else {
+      // For interim results, we only take trailing words that haven't been signed yet
+      if (text.startsWith(lastProcessedText)) {
+        newText = text.slice(lastProcessedText.length).trim();
+      } else {
+        // Speech API changed its mind — restart the stream for this utterance
+        newText = text;
+      }
+      lastProcessedText = text;
+    }
 
-    // Convert text to sign sequence
-    const signs = SignMapper.textToSigns(text);
+    if (!newText || newText.length < 2) return;
+
+    // Convert only the NEW text to sign sequence
+    const signs = SignMapper.textToSigns(newText);
     if (signs.length === 0) return;
 
-    // Clear any pending queue and start fresh for this utterance
-    AvatarOverlay.clearQueue();
+    // Append to existing queue for seamless flow
     AvatarOverlay.enqueueSignSequence(signs);
 
-    // Notify the side panel so it can update educational content
+    // Notify the side panel
     chrome.runtime.sendMessage({
       type:  'SIGNS_UPDATED',
-      signs: signs.slice(0, 10).map(s => ({
+      signs: signs.map(s => ({
         key:          s._key,
         word:         s._word,
         gloss:        s.gloss,
@@ -160,7 +209,7 @@
         culturalNote: s.culturalNote,
         category:     s.category,
       })),
-    }).catch(() => {}); // side panel might not be open
+    }).catch(() => {});
   }
 
   // ── Background message listener ───────────────────────────────────────────
@@ -254,12 +303,8 @@
   });
   urlObserver.observe(document, { subtree: true, childList: true });
 
-  // Initialize immediately if the page is already fully loaded
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    init();
-  } else {
-    document.addEventListener('DOMContentLoaded', init);
-  }
+  // Boot
+  boot();
 
   // ── DevTools bridge ───────────────────────────────────────────────────────
   // Content scripts run in an ISOLATED world — window.SignBridge is not visible

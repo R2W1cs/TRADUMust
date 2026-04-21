@@ -32,11 +32,12 @@
 
     detect() {
       const h = location.hostname;
-      if (h.includes('youtube.com'))         return this.PLATFORMS.YOUTUBE;
-      if (h.includes('meet.google.com'))     return this.PLATFORMS.MEET;
-      if (h.includes('zoom.us'))             return this.PLATFORMS.ZOOM;
-      if (h.includes('teams.microsoft.com')) return this.PLATFORMS.TEAMS;
-      if (h.includes('teams.live.com'))      return this.PLATFORMS.TEAMS;
+      if (h.includes('youtube.com'))          return this.PLATFORMS.YOUTUBE;
+      if (h.includes('meet.google.com'))      return this.PLATFORMS.MEET;
+      if (h.includes('zoom.us'))              return this.PLATFORMS.ZOOM;
+      if (h.includes('teams.microsoft.com'))  return this.PLATFORMS.TEAMS;
+      if (h.includes('teams.live.com'))       return this.PLATFORMS.TEAMS;
+      if (h.includes('teams.cloud.microsoft')) return this.PLATFORMS.TEAMS;
       return this.PLATFORMS.UNKNOWN;
     },
 
@@ -93,12 +94,27 @@
           '[aria-label*="caption"]',
         ],
         'microsoft-teams': [
-          // Teams live captions panel
+          // ── New Teams (Fluent UI v9, 2024+) ──────────────────────────────
+          // Live captions panel — primary target
+          '[data-tid="closed-captions-renderer"]',
+          '[data-tid="live-caption-region"]',
           '[data-tid="closed-captions-text"]',
+          // Fluent UI component class patterns (new Teams)
+          '[class*="captionText"]',
+          '[class*="closedCaption"]',
+          '[class*="CaptionRenderer"]',
+          // Accessibility live region used by new Teams captions
+          '[aria-live="polite"][class*="caption"]',
+          '[aria-live="assertive"][class*="caption"]',
+          // ── Classic Teams (pre-2024 fallback) ────────────────────────────
           '.ts-caption-box',
           '[class*="caption-text"]',
-          // Teams meeting transcript
+          '[class*="caption-item"]',
+          // Teams meeting transcript sidebar
           '[data-tid="message-body-content"]',
+          // Generic accessible live region (last resort)
+          '[aria-label*="caption" i]',
+          '[aria-label*="subtitle" i]',
         ],
         'unknown': [],
       };
@@ -114,7 +130,17 @@
         'youtube':         ['#movie_player video', '.html5-main-video'],
         'google-meet':     ['[data-resolution-cap] video', 'video[jsname]'],
         'zoom':            ['video.video-stream', '#zoom-sdk video'],
-        'microsoft-teams': ['video[class*="video"]', '.video-stream video'],
+        'microsoft-teams': [
+          // New Teams (Fluent UI, 2024+)
+          '[data-tid="calling-participant-stream"] video',
+          '[class*="videoGallery"] video',
+          '[class*="participantVideo"] video',
+          // Classic Teams
+          'video[class*="video"]',
+          '.video-stream video',
+          // Generic fallback
+          'video',
+        ],
         'unknown':         ['video'],
       }[this.detect()] || ['video'];
     },

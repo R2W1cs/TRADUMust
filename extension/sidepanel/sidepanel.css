@@ -1,17 +1,18 @@
 /* SignBridge — Side Panel CSS */
 
 :root {
-  --bg:      #0f172a;
-  --surface: #1e293b;
-  --surface2: #263044;
-  --border:  rgba(255,255,255,0.08);
-  --accent:  #6366f1;
-  --accent2: #38bdf8;
-  --text:    #f1f5f9;
+  --bg:      #080a0f;
+  --surface: rgba(30, 41, 59, 0.4); /* Glass surface */
+  --surface2: rgba(38, 48, 68, 0.6);
+  --border:  rgba(255,255,255,0.1);
+  --accent:  #818cf8;
+  --accent2: #7dd3fc;
+  --text:    #f8fafc;
   --muted:   #94a3b8;
   --success: #34d399;
   --warn:    #fbbf24;
-  --radius:  10px;
+  --radius:  16px;
+  --glass:   blur(12px) saturate(180%);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,8 +98,11 @@ html, body {
   font-size: 11px;
   color: var(--muted);
   background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 7px 12px;
+  padding: 8px 14px;
 }
 .sp-dot {
   width: 7px;
@@ -109,17 +113,48 @@ html, body {
 .sp-dot--inactive { background: var(--muted); }
 .sp-dot--active   {
   background: var(--success);
+  box-shadow: 0 0 10px var(--success);
   animation: sp-pulse 1.8s ease-in-out infinite;
 }
 @keyframes sp-pulse {
-  0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
-  50%     { opacity: 0.7; box-shadow: 0 0 0 4px rgba(52,211,153,0); }
+  0%,100% { transform: scale(1); opacity: 1; }
+  50%     { transform: scale(1.2); opacity: 0.7; }
 }
+
+/* ── Live Visualizer (Sandbox Elite) ────────────────────────────────────── */
+.sp-visualizer {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  margin-left: 6px;
+}
+.sp-v-bar {
+  width: 2px;
+  background: var(--accent2);
+  border-radius: 1px;
+  animation: sp-v-wave 1s ease-in-out infinite;
+  opacity: 0.4;
+}
+.sp-v-bar:nth-child(2) { animation-delay: 0.1s; height: 60%; }
+.sp-v-bar:nth-child(3) { animation-delay: 0.2s; height: 100%; }
+.sp-v-bar:nth-child(4) { animation-delay: 0.3s; height: 75%; }
+.sp-v-bar:nth-child(5) { animation-delay: 0.4s; height: 40%; }
+@keyframes sp-v-wave {
+  0%, 100% { height: 30%; }
+  50% { height: 100%; }
+}
+.sp-dot--active ~ .sp-visualizer .sp-v-bar {
+  opacity: 1;
+}
+
 .sp-strategy {
   margin-left: auto;
   font-size: 10px;
   color: var(--accent2);
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* ── Caption box ─────────────────────────────────────────────────────────── */
@@ -359,6 +394,23 @@ html, body {
   color: #c7d2fe;
   text-align: left;
   line-height: 1.6;
+}
+
+/* ── Confetti Celebration ────────────────────────────────────────────────── */
+.sp-confetti {
+  position: absolute;
+  top: 100px;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: white;
+  z-index: 1000;
+  pointer-events: none;
+  animation: sp-confetti-fall 1s ease-out forwards;
+}
+@keyframes sp-confetti-fall {
+  0%   { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(150px) rotate(360deg); opacity: 0; }
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */

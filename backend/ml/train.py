@@ -36,9 +36,14 @@ from .dataset import (
     wlasl_features_available,
 )
 from .models import SUPERVISED_MODELS, PRODUCTION_MODELS, make_kmeans, make_pca
+from .lstm_model import SignLanguageLSTM, train_lstm_model
 from .validate import split, cross_val, evaluate, learning_curve_data, evaluate_clusters
 
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 MODEL_PATH  = Path(__file__).parent / 'trained_model.pkl'
+LSTM_PATH   = Path(__file__).parent / 'trained_lstm.pt'
 REPORT_PATH = Path(__file__).parent / 'training_report.json'
 
 
@@ -57,6 +62,7 @@ def run_training(
     n_folds:          int  = 5,
     kmeans_clusters:  int  = 20,
     verbose:          bool = True,
+    use_lstm:         bool = False,
 ) -> dict:
     """
     Full training + validation pipeline.
@@ -71,14 +77,16 @@ def run_training(
 
     # ── 1. Load dataset ───────────────────────────────────────────────────────
     if source == 'wlasl':
-        log("\n[1/5] Loading WLASL features from disk...")
-        X, y, classes = load_wlasl_dataset(wlasl_dir)
+        log(f"\n[1/5] Loading WLASL {'sequences' if use_lstm else 'features'} from disk...")
+        X, y, classes = load_wlasl_dataset(wlasl_dir, use_sequences=use_lstm)
         signs_data     = None   # not used for WLASL cluster eval
-        model_pool     = {**SUPERVISED_MODELS, **PRODUCTION_MODELS}
-        log(f"      {X.shape[0]:,} samples  .  {len(classes)} classes  .  {X.shape[1]} features")
-        log(f"      Models: {list(model_pool.keys())}")
+        model_pool     = {**SUPERVISED_MODELS, **PRODUCTION_MODELS} if not use_lstm else {}
+        log(f"      {X.shape[0]:,} samples  .  {len(classes)} classes  .  {X.shape[1:]} shape")
     else:
         log("\n[1/5] Generating synthetic dataset...")
+        if use_lstm:
+            log("      WARNING: Synthetic data does not support sequences. Falling back to pooled features.")
+            use_lstm = False
         X, y, classes = generate_dataset(samples_per_sign=samples_per_sign)
         signs_data     = load_signs()
         model_pool     = SUPERVISED_MODELS
@@ -91,10 +99,11 @@ def run_training(
 
     report: dict = {
         'data_source': source,
+        'model_type': 'LSTM' if use_lstm else 'Classic',
         'dataset': {
             'total_samples':    int(X.shape[0]),
             'n_classes':        len(classes),
-            'n_features':       int(X.shape[1]),
+            'n_features':       int(X.shape[-1]),
             'train_size':       len(X_train),
             'test_size':        len(X_test),
         },
@@ -106,52 +115,85 @@ def run_training(
         report['dataset']['samples_per_sign'] = samples_per_sign
 
     # ── 3. Supervised models ──────────────────────────────────────────────────
-    log(f"\n[3/5] Training & validating {len(model_pool)} supervised models...")
-    best_acc   = 0.0
-    best_name  = None
-    best_model = None
-
-    for name, factory in model_pool.items():
-        log(f"\n  > {name}")
-        model = factory()
-
-        # Cross-validation
-        t0      = time.perf_counter()
-        cv      = cross_val(model, X_train, y_train, n_folds=n_folds)
-        cv_time = time.perf_counter() - t0
-
-        cv_acc = cv['accuracy']['test_mean']
-        log(f"    CV accuracy:  {cv_acc:.4f} ± {cv['accuracy']['test_std']:.4f}  ({cv_time:.1f}s)")
-        log(f"    CV F1:        {cv['f1']['test_mean']:.4f}")
-        log(f"    Overfit gap:  {cv['accuracy']['overfit_gap']:.4f}")
-
-        # Final fit on full training set
-        model.fit(X_train, y_train)
-
-        # Held-out test evaluation
-        eval_res = evaluate(model, X_test, y_test, classes)
-        log(f"    Test accuracy:{eval_res['accuracy']:.4f}")
-        if eval_res['top_k_accuracy']:
-            log(f"    Top-3 acc:    {eval_res['top_k_accuracy']:.4f}")
-
-        report['supervised'][name] = {
-            'cross_validation': cv,
-            'test_evaluation':  eval_res,
-            'training_time_s':  round(cv_time, 2),
+    if use_lstm:
+        log(f"\n[3/5] Training LSTM model (PyTorch)...")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        train_ds = TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train).long())
+        test_ds  = TensorDataset(torch.from_numpy(X_test), torch.from_numpy(y_test).long())
+        
+        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
+        test_loader  = DataLoader(test_ds, batch_size=32)
+        
+        model = SignLanguageLSTM(input_size=X.shape[2], num_classes=len(classes)).to(device)
+        model = train_lstm_model(model, train_loader, test_loader, num_epochs=20, device=device)
+        
+        torch.save(model.state_dict(), LSTM_PATH)
+        best_name = "LSTM"
+        best_model = model
+        
+        # Eval
+        model.eval()
+        with torch.no_grad():
+            inputs = torch.from_numpy(X_test).to(device)
+            outputs = model(inputs)
+            _, predicted = outputs.max(1)
+            acc = predicted.eq(torch.from_numpy(y_test).to(device)).sum().item() / len(y_test)
+        
+        report['supervised']['LSTM'] = {
+            'test_evaluation': {'accuracy': round(acc, 4)}
         }
+        report['best_model'] = {'name': 'LSTM', 'accuracy': round(acc, 4)}
+        log(f"    LSTM Test accuracy: {acc:.4f}")
 
-        if eval_res['accuracy'] > best_acc:
-            best_acc   = eval_res['accuracy']
-            best_name  = name
-            best_model = model
+    else:
+        log(f"\n[3/5] Training & validating {len(model_pool)} supervised models...")
+        best_acc   = 0.0
+        best_name  = None
+        best_model = None
 
-    report['best_model'] = {
-        'name':     best_name,
-        'accuracy': round(best_acc, 4),
-    }
-    log(f"\n  Best supervised model: {best_name} ({best_acc:.4f} accuracy)")
+        for name, factory in model_pool.items():
+            log(f"\n  > {name}")
+            model = factory()
 
-    # ── 4. Unsupervised: K-Means ──────────────────────────────────────────────
+            # Cross-validation
+            t0      = time.perf_counter()
+            cv      = cross_val(model, X_train, y_train, n_folds=n_folds)
+            cv_time = time.perf_counter() - t0
+
+            cv_acc = cv['accuracy']['test_mean']
+            log(f"    CV accuracy:  {cv_acc:.4f} ± {cv['accuracy']['test_std']:.4f}  ({cv_time:.1f}s)")
+            log(f"    CV F1:        {cv['f1']['test_mean']:.4f}")
+            log(f"    Overfit gap:  {cv['accuracy']['overfit_gap']:.4f}")
+
+            # Final fit on full training set
+            model.fit(X_train, y_train)
+
+            # Held-out test evaluation
+            eval_res = evaluate(model, X_test, y_test, classes)
+            log(f"    Test accuracy:{eval_res['accuracy']:.4f}")
+            if eval_res['top_k_accuracy']:
+                log(f"    Top-3 acc:    {eval_res['top_k_accuracy']:.4f}")
+
+            report['supervised'][name] = {
+                'cross_validation': cv,
+                'test_evaluation':  eval_res,
+                'training_time_s':  round(cv_time, 2),
+            }
+
+            if eval_res['accuracy'] > best_acc:
+                best_acc   = eval_res['accuracy']
+                best_name  = name
+                best_model = model
+
+        report['best_model'] = {
+            'name':     best_name,
+            'accuracy': round(best_acc, 4),
+        }
+        log(f"\n  Best supervised model: {best_name} ({best_acc:.4f} accuracy)")
+
+        # ── 4. Unsupervised: K-Means ──────────────────────────────────────────────
+
     log(f"\n[4/5] Unsupervised — K-Means (k={kmeans_clusters})...")
     kmeans = make_kmeans(n_clusters=kmeans_clusters)
     kmeans.fit(X_train)

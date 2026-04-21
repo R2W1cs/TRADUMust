@@ -127,34 +127,34 @@ _WLASL_FEATURES_DIR = Path(__file__).parent / 'wlasl_features'
 
 def load_wlasl_dataset(
     features_dir: Path | None = None,
+    use_sequences: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """
-    Load pre-extracted WLASL features produced by
-    ``backend.ml.extract_features_from_videos``.
+    Load pre-extracted WLASL features.
 
     Parameters
     ----------
-    features_dir : path to directory containing X.npy / y.npy / classes.json
-                   Defaults to backend/ml/wlasl_features/
+    features_dir  : path to directory containing X.npy / y.npy / classes.json
+    use_sequences : if True, loads X_seq.npy (N, seq, 186)
 
     Returns
     -------
-    X       : np.ndarray  (N, 252)  float32   mean+std pooled holistic features
-    y       : np.ndarray  (N,)      int32     integer class labels
-    classes : list[str]             gloss string per integer label
+    X       : np.ndarray  (N, D) or (N, S, D)
+    y       : np.ndarray  (N,)
+    classes : list[str]
     """
     d = Path(features_dir) if features_dir else _WLASL_FEATURES_DIR
 
-    x_path = d / 'X.npy'
+    prefix = 'X_seq' if use_sequences else 'X'
+    x_path = d / f'{prefix}.npy'
     y_path = d / 'y.npy'
     c_path = d / 'classes.json'
 
     if not x_path.exists():
-        raise FileNotFoundError(
-            f"WLASL feature matrix not found: {x_path}\n"
-            "Run:  python -m backend.ml.extract_features_from_videos "
-            "--wlasl_dir data/wlasl --output_dir backend/ml/wlasl_features"
-        )
+        msg = f"Feature matrix not found: {x_path}"
+        if use_sequences:
+            msg += "\nEnsure you ran extraction with save_sequences=True."
+        raise FileNotFoundError(msg)
 
     X = np.load(str(x_path))
     y = np.load(str(y_path))

@@ -2,11 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Default: Elegant White Theme ─────────────────────────────────────────── */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
+  --surface: #f8fafc;
+  --card-bg: #ffffff;
+  --brand-primary: #4f46e5;
+  --brand-secondary: #0ea5e9;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --shadow-color: rgba(15, 23, 42, 0.08);
+
+  /* Component-level tokens */
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(15, 23, 42, 0.09);
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --nav-bg: rgba(255, 255, 255, 0.92);
+  --input-bg: #f1f5f9;
+
+  /* Extended tokens for inner pages */
+  --surface-deep: #f1f5f9;
+  --surface-raised: #ffffff;
+  --result-grad-from: rgba(79, 70, 229, 0.05);
+  --result-grad-to:   rgba(14, 165, 233, 0.04);
+  --result-border-color: rgba(79, 70, 229, 0.13);
+  --result-shadow:    rgba(79, 70, 229, 0.07);
+  --cultural-bg:      rgba(255, 251, 235, 0.75);
+  --cultural-label:   #b45309;
+  --cultural-accent:  #92400e;
+  --error-bg:         rgba(254, 242, 242, 0.9);
+  --error-border:     rgba(239, 68, 68, 0.2);
+  --error-title:      #b91c1c;
+  --error-body:       #7f1d1d;
+  --sign-deep:        #f1f5f9;
+  --tag-bg:           #f1f5f9;
+  --tag-text:         #64748b;
+  --tag-border:       rgba(15, 23, 42, 0.09);
 }
 
+/* ── Dark Mode ─────────────────────────────────────────────────────────────── */
+.dark-mode {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --surface: #0f172a;
+  --card-bg: rgba(15, 23, 42, 0.4);
+  --brand-primary: #a855f7;
+  --brand-secondary: #0ea5e9;
+  --glass-bg: rgba(15, 23, 42, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.5);
+
+  --panel-bg: rgba(15, 23, 42, 0.6);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --nav-bg: rgba(2, 6, 23, 0.75);
+  --input-bg: rgba(30, 41, 59, 0.8);
+
+  /* Extended tokens for inner pages */
+  --surface-deep:        rgba(2, 6, 23, 0.6);
+  --surface-raised:      rgba(15, 23, 42, 0.4);
+  --result-grad-from:    rgba(15, 23, 42, 0.6);
+  --result-grad-to:      rgba(23, 37, 84, 0.4);
+  --result-border-color: rgba(59, 130, 246, 0.2);
+  --result-shadow:       rgba(59, 130, 246, 0.1);
+  --cultural-bg:         rgba(120, 53, 15, 0.2);
+  --cultural-label:      #fbbf24;
+  --cultural-accent:     #fcd34d;
+  --error-bg:            rgba(127, 29, 29, 0.4);
+  --error-border:        rgba(239, 68, 68, 0.3);
+  --error-title:         #f87171;
+  --error-body:          #fca5a5;
+  --sign-deep:           rgba(2, 6, 23, 0.8);
+  --tag-bg:              rgba(30, 41, 59, 0.8);
+  --tag-text:            #94a3b8;
+  --tag-border:          rgba(255, 255, 255, 0.08);
+}
+
+/* ── Cultural Themes (dark overlays) ───────────────────────────────────────── */
+.theme-japan {
+  --background: #0d0909;
+  --brand-primary: #f472b6;
+  --brand-secondary: #fce7f3;
+  --glass-bg: rgba(251, 114, 182, 0.05);
+  --glass-border: rgba(251, 114, 182, 0.2);
+}
+
+.theme-france {
+  --background: #050a1f;
+  --brand-primary: #fbbf24;
+  --brand-secondary: #2563eb;
+  --glass-bg: rgba(37, 99, 235, 0.05);
+  --glass-border: rgba(251, 191, 36, 0.2);
+}
+
+.theme-mexico {
+  --background: #1a0f0a;
+  --brand-primary: #f97316;
+  --brand-secondary: #facc15;
+  --glass-bg: rgba(249, 115, 22, 0.05);
+  --glass-border: rgba(250, 204, 21, 0.2);
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
   padding: 0;
@@ -17,24 +117,153 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.6s ease, color 0.6s ease;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth scroll */
 html {
   scroll-behavior: smooth;
 }
 
-/* Focus visible ring for accessibility */
 :focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* ── Utility Classes ───────────────────────────────────────────────────────── */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 1px 3px 0 var(--shadow-color), 0 1px 2px -1px var(--shadow-color);
+}
+
+.shadow-premium {
+  box-shadow: 0 0 0 1px var(--glass-border), 0 10px 15px -3px var(--shadow-color), 0 4px 6px -4px var(--shadow-color);
+}
+
+.hairline-border {
+  border: 1px solid var(--glass-border);
+}
+
+.text-muted-high {
+  color: var(--text-secondary);
+}
+
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+}
+
+.theme-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+}
+
+.theme-input {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+}
+
+/* ── Page Shell ────────────────────────────────────────────────────────────── */
+.page-shell {
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+/* ── Tab Bar ───────────────────────────────────────────────────────────────── */
+.tab-bar {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Theme-aware select ────────────────────────────────────────────────────── */
+.theme-select {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  color: var(--foreground);
+}
+.theme-select:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+}
+
+/* ── Translation result card ───────────────────────────────────────────────── */
+.result-card {
+  background: linear-gradient(135deg, var(--result-grad-from), var(--result-grad-to));
+  border: 1px solid var(--result-border-color);
+  box-shadow: 0 0 40px var(--result-shadow);
+}
+
+/* ── Cultural note box ─────────────────────────────────────────────────────── */
+.cultural-note-card {
+  background: var(--cultural-bg);
+  border-color: var(--result-border-color);
+}
+
+/* ── Error alert ───────────────────────────────────────────────────────────── */
+.error-alert {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+}
+
+/* ── List / history item ───────────────────────────────────────────────────── */
+.list-item {
+  background: var(--surface);
+  border: 1px solid var(--panel-border);
+  transition: background 0.15s, border-color 0.15s;
+}
+.list-item:hover {
+  background: var(--input-bg);
+}
+
+/* ── Phrasebook card ───────────────────────────────────────────────────────── */
+.phrase-card {
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 1px 3px var(--shadow-color), 0 4px 8px var(--shadow-color);
+}
+.phrase-card:hover {
+  box-shadow: 0 1px 3px var(--shadow-color), 0 8px 20px var(--shadow-color);
 }

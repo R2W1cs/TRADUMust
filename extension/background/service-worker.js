@@ -23,8 +23,32 @@
 'use strict';
 
 // ─── State ───────────────────────────────────────────────────────────────────
-// Map<tabId, { captureActive: bool, streamId: string|null, offscreenCreated: bool }>
+// In-memory map for the current SW lifetime.
+// All mutations are also written to chrome.storage.session so state survives
+// the silent restarts that MV3 service workers undergo between events.
 const tabState = new Map();
+
+async function loadTabState() {
+  try {
+    const { _sbTabState } = await chrome.storage.session.get('_sbTabState');
+    if (_sbTabState) {
+      for (const [k, v] of Object.entries(_sbTabState)) {
+        tabState.set(Number(k), v);
+      }
+    }
+  } catch { /* storage.session not available on older Chrome builds */ }
+}
+
+function persistTabState() {
+  try {
+    const obj = {};
+    for (const [k, v] of tabState) obj[k] = v;
+    chrome.storage.session.set({ _sbTabState: obj }).catch(() => {});
+  } catch {}
+}
+
+// Hydrate from storage immediately when the SW starts
+loadTabState();
 
 // ─── Extension lifecycle ──────────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(({ reason }) => {
@@ -103,10 +127,12 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (!tab?.id) return;
 
   if (command === 'toggle-avatar') {
-    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_AVATAR' });
+    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_AVATAR' }).catch(() => {
+      // Content script not present on this tab — ignore
+    });
   }
   if (command === 'toggle-captions') {
-    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_CAPTIONS' });
+    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_CAPTIONS' }).catch(() => {});
   }
 });
 
@@ -114,6 +140,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabState.has(tabId)) {
     tabState.delete(tabId);
+    persistTabState();
   }
 });
 
@@ -143,18 +170,28 @@ async function handleStartCapture(tabId, sendResponse) {
 
     // Persist state
     tabState.set(tabId, { captureActive: true, streamId, offscreenCreated: false });
+    persistTabState();
 
     // Create or reuse the offscreen document for audio processing
     await ensureOffscreenDocument();
+
+    // Give the offscreen document a moment to register its message listener
+    // before sending INIT_CAPTURE — the document may have just been created.
+    await new Promise(r => setTimeout(r, 150));
 
     // Tell the offscreen doc which stream to capture
     chrome.runtime.sendMessage({
       type:     'INIT_CAPTURE',
       streamId: streamId,
       tabId:    tabId,
+    }).catch((err) => {
+      // Offscreen doc not yet listening — not fatal; it will request the streamId
+      // again on its own onMessage listener when ready.
+      console.warn('[SignBridge SW] INIT_CAPTURE delivery failed:', err.message);
     });
 
     tabState.get(tabId).offscreenCreated = true;
+    persistTabState();
     sendResponse({ ok: true, streamId });
 
   } catch (err) {
@@ -169,6 +206,7 @@ function handleStopCapture(tabId) {
   const state = tabState.get(tabId);
   if (state?.captureActive) {
     tabState.set(tabId, { ...state, captureActive: false });
+    persistTabState();
     chrome.runtime.sendMessage({ type: 'STOP_CAPTURE', tabId }).catch(() => {});
   }
 }
@@ -251,7 +289,8 @@ function detectPlatformFromUrl(url = '') {
   if (url.includes('youtube.com'))         return 'youtube';
   if (url.includes('meet.google.com'))     return 'google-meet';
   if (url.includes('zoom.us'))             return 'zoom';
-  if (url.includes('teams.microsoft.com')) return 'microsoft-teams';
-  if (url.includes('teams.live.com'))      return 'microsoft-teams';
+  if (url.includes('teams.microsoft.com'))  return 'microsoft-teams';
+  if (url.includes('teams.live.com'))       return 'microsoft-teams';
+  if (url.includes('teams.cloud.microsoft')) return 'microsoft-teams';
   return 'unknown';
 }

@@ -96,16 +96,17 @@ def extract_video_features(
     video_path: Path,
     max_frames: int = 64,
     frame_step: int = 2,
+    return_sequence: bool = False,
 ) -> np.ndarray | None:
     """
-    Run MediaPipe HolisticLandmarker on a video and return a 252-dim
-    pooled feature vector (mean+std of per-frame 126-dim vectors).
+    Run MediaPipe HolisticLandmarker on a video and return features.
 
     Parameters
     ----------
-    video_path  : path to the video file
-    max_frames  : maximum frames to sample (default 64 = ~2 s at 30 fps)
-    frame_step  : stride between sampled frames (default 2 = every other frame)
+    video_path      : path to the video file
+    max_frames      : maximum frames to sample
+    frame_step      : stride between sampled frames
+    return_sequence : if True, returns (seq_len, 186), otherwise pooled (372,)
 
     Returns None if the video cannot be opened or yields no detections.
     """
@@ -147,22 +148,32 @@ def extract_video_features(
             rh   = _lm_to_dict_list(result.right_hand_landmarks)
             lh   = _lm_to_dict_list(result.left_hand_landmarks)
             pose = _lm_to_dict_list(result.pose_landmarks)
+            face = _lm_to_dict_list(result.face_landmarks)
 
-            feat = extract_holistic_features(rh or None, lh or None, pose or None)
+            feat = extract_holistic_features(rh or None, lh or None, pose or None, face or None)
             per_frame_feats.append(feat)
 
     if not per_frame_feats:
         return None
 
-    return pool_frame_sequence(per_frame_feats)   # (252,)
+    if return_sequence:
+        # Pad sequence to max_frames // frame_step
+        target_len = max_frames // frame_step
+        seq = np.array(per_frame_feats, dtype=np.float32)
+        if len(seq) < target_len:
+            pad = np.zeros((target_len - len(seq), seq.shape[1]), dtype=np.float32)
+            seq = np.vstack([seq, pad])
+        return seq[:target_len]
+    
+    return pool_frame_sequence(per_frame_feats)
 
 
 # ── Worker function (runs in subprocess) ────────────────────────────────────
 
 def _worker(args):
-    video_path, gloss, label = args
+    video_path, gloss, label, return_sequence = args
     try:
-        feat = extract_video_features(Path(video_path))
+        feat = extract_video_features(Path(video_path), return_sequence=return_sequence)
         if feat is not None:
             return (feat, label, gloss, str(video_path))
         return None
@@ -179,19 +190,10 @@ def extract_wlasl(
     max_videos_per_gloss: int = 0,   # 0 = no limit
     workers: int = 4,
     verbose: bool = True,
+    save_sequences: bool = False,
 ) -> Path:
     """
     Full WLASL feature extraction pipeline.
-
-    Parameters
-    ----------
-    wlasl_dir            : directory containing WLASL_v0.3.json + videos/
-    output_dir           : where to save X.npy, y.npy, classes.json
-    subset               : number of top-frequency glosses to use
-    max_videos_per_gloss : cap videos per gloss (0 = use all)
-    workers              : parallel processes (0 = serial, safer for debug)
-
-    Returns path to output_dir.
     """
     def log(msg):
         if verbose:
@@ -212,13 +214,6 @@ def extract_wlasl(
     with open(json_path, 'r') as f:
         wlasl = json.load(f)
 
-    # ── Build task list ────────────────────────────────────────────────────
-    # WLASL JSON structure:
-    # [ { "gloss": "book", "instances": [
-    #       { "video_id": "00001", "signer_id": 1, "split": "train", ... }, ...
-    #   ]}, ... ]
-
-    # Select top-N glosses by total instance count
     sorted_entries = sorted(wlasl, key=lambda e: len(e['instances']), reverse=True)
     selected       = sorted_entries[:subset]
     classes        = [e['gloss'].upper() for e in selected]
@@ -226,45 +221,26 @@ def extract_wlasl(
 
     log(f"\n[WLASL] Selected {len(classes)} glosses from {len(wlasl)} total")
 
-    tasks        = []   # (video_path, gloss, label)
-    missing      = 0
+    tasks        = []   # (video_path, gloss, label, save_sequences)
     meta_rows    = []
 
     for entry in selected:
         gloss       = entry['gloss'].upper()
         label       = label_map[gloss]
-        instances   = entry['instances']
-
-        if max_videos_per_gloss:
-            instances = instances[:max_videos_per_gloss]
-
-        for inst in instances:
+        for inst in entry['instances']:
             vid_id = str(inst['video_id'])
-            # Try common extensions
             for ext in ('.mp4', '.avi', '.mov', '.mkv', ''):
                 vpath = videos_dir / f"{vid_id}{ext}"
                 if vpath.exists():
-                    tasks.append((str(vpath), gloss, label))
+                    tasks.append((str(vpath), gloss, label, save_sequences))
                     meta_rows.append({
-                        'video_id':  vid_id,
-                        'gloss':     gloss,
-                        'label':     label,
+                        'video_id': vid_id, 'gloss': gloss, 'label': label,
                         'signer_id': inst.get('signer_id', -1),
-                        'split':     inst.get('split', 'train'),
+                        'split': inst.get('split', 'train'),
                     })
                     break
-            else:
-                missing += 1
 
-    log(f"[WLASL] Tasks: {len(tasks)} videos found, {missing} missing")
-    if not tasks:
-        raise RuntimeError("No video files found. Check that videos/ is populated.")
-
-    # ── Extract features ──────────────────────────────────────────────────
     log(f"\n[WLASL] Extracting features ({workers} workers)...")
-    log(       "       This takes ~1-2 hours for WLASL300 on a laptop.")
-    log(       "       Progress is saved as X.npy on completion.\n")
-
     X_rows, y_rows, meta_out = [], [], []
     done = 0
 
@@ -274,8 +250,7 @@ def extract_wlasl(
             for fut in as_completed(futures):
                 result = fut.result()
                 done += 1
-                if done % 100 == 0:
-                    log(f"  {done}/{len(tasks)} videos processed ...")
+                if done % 100 == 0: log(f"  {done}/{len(tasks)} videos processed ...")
                 if result is not None:
                     feat, label, gloss, vpath = result
                     X_rows.append(feat)
@@ -284,26 +259,23 @@ def extract_wlasl(
     else:
         for i, task in enumerate(tasks):
             result = _worker(task)
-            if i % 50 == 0:
-                log(f"  {i}/{len(tasks)} videos processed ...")
+            if i % 50 == 0: log(f"  {i}/{len(tasks)} videos processed ...")
             if result is not None:
                 feat, label, gloss, vpath = result
                 X_rows.append(feat)
                 y_rows.append(label)
                 meta_out.append(meta_rows[i])
 
-    if not X_rows:
-        raise RuntimeError("Feature extraction produced zero samples. Check video format.")
-
-    X = np.stack(X_rows).astype(np.float32)   # (N, 252)
-    y = np.array(y_rows, dtype=np.int32)       # (N,)
-
+    X = np.stack(X_rows).astype(np.float32)
+    y = np.array(y_rows, dtype=np.int32)
+    
     # ── Signer-stratified split metadata ────────────────────────────────
     # Tag each sample with signer_id so train.py can do cross-signer eval
     signer_ids = np.array([m['signer_id'] for m in meta_out], dtype=np.int32)
 
     # Save
-    np.save(output_dir / 'X.npy',          X)
+    prefix = 'X_seq' if save_sequences else 'X'
+    np.save(output_dir / f'{prefix}.npy', X)
     np.save(output_dir / 'y.npy',          y)
     np.save(output_dir / 'signer_ids.npy', signer_ids)
 
@@ -346,6 +318,8 @@ if __name__ == '__main__':
     parser.add_argument('--workers',     type=int, default=4,
                         help='Parallel processes (0 = serial)')
     parser.add_argument('--verbose',     action='store_true', default=True)
+    parser.add_argument('--save_sequences', action='store_true',
+                        help='Save raw landmark sequences (N, Seq, D) for LSTM')
 
     args = parser.parse_args()
 
@@ -356,4 +330,5 @@ if __name__ == '__main__':
         max_videos_per_gloss=args.max_videos,
         workers=args.workers,
         verbose=args.verbose,
+        save_sequences=args.save_sequences,
     )

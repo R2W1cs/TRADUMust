@@ -1372,7 +1372,7 @@
           }
         ]
       },
-      "training_time_s": 0.06
+      "training_time_s": 0.13
     },
     "RandomForest": {
       "cross_validation": {
@@ -2737,7 +2737,7 @@
           }
         ]
       },
-      "training_time_s": 0.73
+      "training_time_s": 1.83
     },
     "SVM": {
       "cross_validation": {
@@ -4102,7 +4102,7 @@
           }
         ]
       },
-      "training_time_s": 1.41
+      "training_time_s": 2.68
     }
   },
   "unsupervised": {

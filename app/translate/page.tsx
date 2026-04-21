@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/lib/use-debounce";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, BookOpen, Volume2, Globe, Sparkles, AlertCircle, Bookmark, Check, ArrowRight } from "lucide-react";
+import { LogoCompact } from "@/components/Logo";
 import {
   getTranslationHistory,
   savePhrasebookEntry,
@@ -10,6 +13,8 @@ import {
   type HistoryEntry,
   type TranslationResult,
 } from "@/lib/api-client";
+import { speechService } from "@/lib/speech-service";
+import { cn } from "@/lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const LANGUAGES = [
@@ -28,17 +33,16 @@ const LANGUAGES = [
 
 const TARGET_LANGUAGES = LANGUAGES.filter((l) => l.code !== "auto");
 
-// Mock translation logic has been removed to integrate actual real data API.
 // ── Sub-components ─────────────────────────────────────────────────────────
 function FormalityBadge({ level }: { level: TranslationResult["formality_level"] }) {
   const styles = {
-    formal: "bg-blue-100 text-blue-700 border-blue-200",
-    informal: "bg-amber-100 text-amber-700 border-amber-200",
-    neutral: "bg-slate-100 text-slate-600 border-slate-200",
+    formal:   "bg-blue-50   dark:bg-blue-500/20   text-blue-700   dark:text-blue-300   border-blue-200   dark:border-blue-500/30   shadow-[0_0_10px_rgba(59,130,246,0.08)]  dark:shadow-[0_0_10px_rgba(59,130,246,0.2)]",
+    informal: "bg-orange-50 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.08)]  dark:shadow-[0_0_10px_rgba(249,115,22,0.2)]",
+    neutral:  "bg-slate-100 dark:bg-slate-500/30  text-slate-600  dark:text-slate-300  border-slate-200  dark:border-slate-500/40",
   };
   const labels = { formal: "Formal Register", informal: "Informal Register", neutral: "Neutral Register" };
   return (
-    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${styles[level]}`}>
+    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${styles[level]}`}>
       {labels[level]}
     </span>
   );
@@ -47,18 +51,25 @@ function FormalityBadge({ level }: { level: TranslationResult["formality_level"]
 function CulturalNoteBox({ result }: { result: TranslationResult }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
-      <div className="flex items-start gap-3 p-4">
-        <span className="text-xl shrink-0 mt-0.5">🌍</span>
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      className="mt-6 rounded-2xl border border-amber-400/30 dark:border-amber-500/30 overflow-hidden shadow-lg shadow-amber-500/5 relative cultural-note-card"
+    >
+      <div className="absolute top-0 left-0 w-1 bg-gradient-to-b from-amber-400 to-amber-600 h-full" />
+      <div className="flex items-start gap-4 p-5">
+        <div className="p-2 bg-amber-500/15 dark:bg-amber-500/20 rounded-xl border border-amber-400/25 dark:border-amber-500/30 shrink-0 mt-1">
+          <Globe className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-semibold text-amber-800 text-sm">Cultural Context</span>
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <span className="font-bold text-[var(--cultural-label)] text-sm tracking-wide">Cultural Context</span>
             <FormalityBadge level={result.formality_level} />
-            <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+            <span className="text-xs font-semibold text-[var(--cultural-label)] bg-amber-500/15 px-3 py-1 rounded-full border border-amber-400/25">
               {result.regional_variant}
             </span>
           </div>
-          <p className="text-sm text-amber-900 leading-relaxed">{result.cultural_note}</p>
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{result.cultural_note}</p>
         </div>
       </div>
 
@@ -66,21 +77,28 @@ function CulturalNoteBox({ result }: { result: TranslationResult }) {
         <>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center justify-between px-4 py-2.5 bg-amber-100/60 hover:bg-amber-100 transition-colors border-t border-amber-200 text-left"
+            className="w-full flex items-center justify-between px-5 py-3 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors border-t border-amber-400/20 dark:border-amber-500/20 text-left group"
           >
-            <span className="text-sm font-medium text-amber-800">
-              📚 Why this translation works — formality explained
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-300 group-hover:text-amber-800 dark:group-hover:text-amber-200 flex items-center gap-2">
+              <BookOpen className="w-4 h-4" /> Why this translation works — formality explained
             </span>
-            <span className="text-amber-600 text-lg leading-none">{expanded ? "−" : "+"}</span>
+            <span className="text-amber-600 dark:text-amber-400 text-lg leading-none">{expanded ? "−" : "+"}</span>
           </button>
-          {expanded && (
-            <div className="px-4 py-4 bg-amber-50 border-t border-amber-200">
-              <p className="text-sm text-amber-900 leading-relaxed">{result.formality_detail}</p>
-            </div>
-          )}
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="px-5 py-4 bg-amber-50/60 dark:bg-amber-950/40 border-t border-amber-400/20 dark:border-amber-500/20"
+              >
+                <p className="text-sm text-amber-900/70 dark:text-amber-100/70 leading-relaxed italic border-l-2 border-amber-500/40 pl-3 ml-2">{result.formality_detail}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -96,7 +114,6 @@ export default function TranslatePage() {
   const [savingPhrasebook, setSavingPhrasebook] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<HistoryEntry | null>(null);
 
-  // Real-time: debounce input + target lang changes → auto-translate
   const debouncedInput = useDebounce(inputText, 500);
   const debouncedTarget = useDebounce(targetLang, 300);
   const [savedToPhrasebook, setSavedToPhrasebook] = useState(false);
@@ -106,42 +123,21 @@ export default function TranslatePage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const MAX_CHARS = 500;
 
-  // Load recent history from the backend and preload speechSynthesis voices
   useEffect(() => {
     let cancelled = false;
-
     getTranslationHistory(10)
-      .then((entries) => {
-        if (!cancelled) {
-          setRecentTranslations(entries);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRecentTranslations([]);
-        }
-      });
+      .then((entries) => { if (!cancelled) setRecentTranslations(entries); })
+      .catch(() => { if (!cancelled) setRecentTranslations([]); });
 
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.getVoices();
-      };
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
     }
-
-    return () => {
-      cancelled = true;
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = null;
-      }
-    };
+    return () => { cancelled = true; if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
-  // Auto-translate whenever debounced input or target language changes
   useEffect(() => {
-    if (debouncedInput.trim()) {
-      handleTranslate();
-    }
+    if (debouncedInput.trim()) handleTranslate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedInput, debouncedTarget]);
 
@@ -149,7 +145,6 @@ export default function TranslatePage() {
     setRecentTranslations((prev) => [entry, ...prev.filter((t) => t.id !== entry.id)].slice(0, 10));
   }, []);
 
-  // ── Translate ────────────────────────────────────────────────────────────
   const handleTranslate = useCallback(async () => {
     if (!inputText.trim()) return;
     setLoading(true);
@@ -157,19 +152,19 @@ export default function TranslatePage() {
     setSavedToPhrasebook(false);
 
     try {
-      const response = await translateText({
-        text: inputText,
-        source_lang: sourceLang,
-        target_lang: targetLang,
-      });
-
+      const response = await translateText({ text: inputText, source_lang: sourceLang, target_lang: targetLang });
       const { history_entry, ...translation } = response;
       setResult(translation);
-      setCurrentEntry(history_entry);
-      setSavedToPhrasebook(history_entry.isPhrasebook);
-      saveRecent(history_entry);
+      if (history_entry) {
+        setCurrentEntry(history_entry);
+        setSavedToPhrasebook(history_entry.isPhrasebook);
+        saveRecent(history_entry);
+      } else {
+        setCurrentEntry(null);
+        setSavedToPhrasebook(false);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Translation failed. Check your connection and try again.");
+      setError(err instanceof Error ? err.message : "Translation failed. Check your connection.");
       setResult(null);
       setCurrentEntry(null);
     } finally {
@@ -177,7 +172,6 @@ export default function TranslatePage() {
     }
   }, [inputText, sourceLang, targetLang, saveRecent]);
 
-  // ── Save to Phrasebook ────────────────────────────────────────────────────
   const saveToPhrasebook = async () => {
     if (!currentEntry || savedToPhrasebook) return;
     setSavingPhrasebook(true);
@@ -185,9 +179,7 @@ export default function TranslatePage() {
       const response = await savePhrasebookEntry(currentEntry.id);
       setSavedToPhrasebook(true);
       setCurrentEntry(response.entry);
-      setRecentTranslations((prev) =>
-        prev.map((entry) => (entry.id === response.entry.id ? response.entry : entry))
-      );
+      setRecentTranslations((prev) => prev.map((e) => (e.id === response.entry.id ? response.entry : e)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Saving to phrasebook failed.");
     } finally {
@@ -195,282 +187,235 @@ export default function TranslatePage() {
     }
   };
 
-  // ── Speak Aloud ────────────────────────────────────────────────────────────
   const speakAloud = () => {
     if (!result) return;
-    setSpeakLoading(true);
-    const utterance = new SpeechSynthesisUtterance(result.translated_text);
-    const langMap: Record<string, string> = {
-      fr: "fr-FR", es: "es-ES", de: "de-DE", ja: "ja-JP",
-      zh: "zh-CN", ar: "ar-SA", pt: "pt-BR", ko: "ko-KR",
-      it: "it-IT", en: "en-US",
-    };
-    const targetLangCode = langMap[targetLang] ?? "en-US";
-    utterance.lang = targetLangCode;
-
-    // Try to pick a high-quality, natural-sounding voice
-    const voices = window.speechSynthesis.getVoices();
-    const langPrefix = targetLangCode.split('-')[0].toLowerCase();
-    
-    // Filter voices that match the language (case-insensitive prefix match)
-    const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(langPrefix));
-    
-    if (matchingVoices.length > 0) {
-      // Prefer Premium, Natural, Google, or Microsoft voices as they sound less robotic
-      let bestVoice = matchingVoices.find(v => {
-        const name = v.name.toLowerCase();
-        return name.includes('premium') || name.includes('natural') || name.includes('google') || name.includes('microsoft');
-      });
-
-      // If no high-quality voice is found, fallback to the local service or first matching voice
-      if (!bestVoice) {
-        bestVoice = matchingVoices.find(v => v.localService) || matchingVoices[0];
-      }
-      
-      utterance.voice = bestVoice;
-      utterance.lang = bestVoice.lang; // Force the browser to use the exact locale of the specific voice picked
-    }
-
-    // Slightly reduce speech rate for better clarity and fluency
-    utterance.rate = 0.9;
-    utterance.onend = () => setSpeakLoading(false);
-    utterance.onerror = (err) => {
-      console.error("Speech error", err);
-      setSpeakLoading(false); 
-    }; 
-    window.speechSynthesis.speak(utterance);
+    speechService.speak(result.translated_text, targetLang);
   };
 
-  // ── Voice Input ───────────────────────────────────────────────────────────
   const toggleListening = () => {
     if (typeof window === "undefined") return;
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition })
-        .SpeechRecognition ??
-      (window as unknown as { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition })
-        .webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in your browser. Try Chrome.");
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
+    const SpeechRecognition = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Speech recognition is not supported in your browser."); return; }
+    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
-    recognition.lang = "en-US";
+    const langMap: Record<string, string> = { fr: "fr-FR", es: "es-ES", de: "de-DE", ja: "ja-JP", zh: "zh-CN", ar: "ar-SA", pt: "pt-BR", ko: "ko-KR", it: "it-IT", en: "en-US", auto: "en-US" };
+    recognition.lang = langMap[sourceLang] ?? "en-US";
     recognition.interimResults = false;
-    recognition.onresult = (e) => {
-      setInputText(e.results[0][0].transcript);
-      setIsListening(false);
-    };
-    recognition.onerror = () => setIsListening(false);
+    recognition.onresult = (e: any) => { if (e.results[0]?.[0]) setInputText(e.results[0][0].transcript); setIsListening(false); };
+    recognition.onerror = (e: any) => { console.error(e.error); setIsListening(false); };
     recognition.onend = () => setIsListening(false);
-    recognition.start();
-    setIsListening(true);
+    try { recognition.start(); setIsListening(true); } catch { setIsListening(false); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="page-shell font-sans relative">
+      {/* Decorative background blobs — subtle for light, richer for dark */}
+      <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-400/8 dark:bg-blue-900/20 blur-[150px] rounded-full pointer-events-none" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-400/8 dark:bg-purple-900/20 blur-[150px] rounded-full pointer-events-none" />
+
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors">
-            <span>←</span>
-            <span className="text-sm font-medium">TRADUMUST</span>
+      <header className="glass-panel px-6 py-4 sticky top-0 z-40 border-b border-[var(--panel-border)] rounded-b-none shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors group">
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <LogoCompact />
           </Link>
-          <h1 className="font-bold text-slate-900">Translation Studio</h1>
-          <Link href="/phrasebook" className="text-sm text-blue-600 hover:underline font-medium">
-            📚 Phrasebook
+          <h1 className="font-bold text-lg hidden sm:block text-[var(--foreground)]">Translation Studio</h1>
+          <Link href="/phrasebook" className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors bg-purple-500/10 px-4 py-2 rounded-full border border-purple-400/20 dark:border-purple-500/20 hover:border-purple-400/40 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-purple-500/10 w-0 group-hover:w-full transition-all duration-300" />
+            <BookOpen className="w-4 h-4" />
+            <span>Phrasebook</span>
           </Link>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 flex gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col lg:flex-row gap-8 relative z-10 w-full overflow-hidden">
         {/* ── Main Content ── */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
+
           {/* Tab Switch */}
-          <div className="flex bg-white rounded-xl border border-slate-200 p-1 mb-6 w-fit">
+          <div className="flex p-1 tab-bar rounded-2xl w-fit shadow-sm">
             {(["text", "voice"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-sm font-semibold transition-all relative flex items-center gap-2",
                   activeTab === tab
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                    ? "text-white"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                )}
               >
-                {tab === "text" ? "✍️ Text Translation" : "🎤 Voice Translation"}
+                {activeTab === tab && (
+                  <motion.div layoutId="tab-bg" className="absolute inset-0 bg-blue-600 rounded-xl" style={{ zIndex: -1 }} />
+                )}
+                {tab === "text" ? "✍️ Text" : "🎤 Voice"}
               </button>
             ))}
           </div>
 
-          {/* Language Selectors */}
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <select
-              value={sourceLang}
-              onChange={(e) => setSourceLang(e.target.value)}
-              className="flex-1 min-w-[140px] bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => {
-                const s = sourceLang === "auto" ? "en" : sourceLang;
-                setSourceLang(targetLang);
-                setTargetLang(s);
-              }}
-              title="Swap languages"
-              className="p-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-600 hover:text-blue-600"
-            >
-              ⇄
-            </button>
-
-            <select
-              value={targetLang}
-              onChange={(e) => setTargetLang(e.target.value)}
-              className="flex-1 min-w-[140px] bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {TARGET_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Input Area */}
-          <div className="bg-white rounded-xl border border-slate-200 mb-4 overflow-hidden">
-            <div className="relative">
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value.slice(0, MAX_CHARS))}
-                placeholder="Type or paste text to translate..."
-                className="w-full p-4 text-slate-800 resize-none focus:outline-none text-base leading-relaxed min-h-[140px]"
-                rows={5}
-              />
-              {activeTab === "voice" && (
-                <button
-                  onClick={toggleListening}
-                  className={`absolute top-3 right-3 p-2.5 rounded-full transition-all ${
-                    isListening
-                      ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-200"
-                      : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-600"
-                  }`}
-                  title={isListening ? "Stop listening" : "Start voice input"}
-                >
-                  🎤
-                </button>
-              )}
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-100">
-              <span className={`text-xs ${inputText.length > MAX_CHARS * 0.9 ? "text-amber-600" : "text-slate-400"}`}>
-                {inputText.length}/{MAX_CHARS}
-              </span>
-              {isListening && (
-                <span className="text-xs text-red-600 font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-                  Listening...
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  setInputText("");
-                  setResult(null);
-                  setCurrentEntry(null);
-                  setSavedToPhrasebook(false);
-                }}
-                className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-6 rounded-3xl relative">
+            {/* Language Selectors */}
+            <div className="flex items-center gap-4 mb-6">
+              <select
+                value={sourceLang}
+                onChange={(e) => setSourceLang(e.target.value)}
+                className="theme-select flex-1 min-w-[140px] rounded-xl px-4 py-3 text-sm font-bold focus:outline-none hover:border-[var(--brand-primary)]/40 transition-colors"
+                style={{ WebkitAppearance: "none", MozAppearance: "none" }}
               >
-                Clear ✕
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => { const s = sourceLang === "auto" ? "en" : sourceLang; setSourceLang(targetLang); setTargetLang(s); }}
+                className="p-3 bg-[var(--panel-bg)] border border-[var(--panel-border)] rounded-xl hover:bg-[var(--surface)] transition-colors text-[var(--foreground)] group shadow-sm"
+              >
+                <ArrowRight className="w-5 h-5 group-hover:rotate-180 transition-transform duration-300" />
               </button>
-            </div>
-          </div>
 
-          {/* Translate Button */}
-          <button
-            onClick={handleTranslate}
-            disabled={loading || !inputText.trim()}
-            className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99] shadow-md shadow-blue-200 mb-6 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Translating...
-              </>
-            ) : (
-              <>
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" />
-                🌐 Live Translation On
-              </>
+              <select
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value)}
+                className="theme-select flex-1 min-w-[140px] rounded-xl px-4 py-3 text-sm font-bold focus:outline-none hover:border-[var(--brand-primary)]/40 transition-colors"
+                style={{ WebkitAppearance: "none", MozAppearance: "none" }}
+              >
+                {TARGET_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Input Area */}
+            <div className="bg-[var(--input-bg)] rounded-2xl border border-[var(--panel-border)] overflow-hidden transition-all focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/30 shadow-inner block">
+              <div className="relative">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value.slice(0, MAX_CHARS))}
+                  placeholder="Type or paste text to translate..."
+                  className="w-full p-5 bg-transparent text-[var(--foreground)] resize-none focus:outline-none text-lg leading-relaxed min-h-[140px] placeholder:text-[var(--text-muted)]"
+                  rows={5}
+                />
+                <AnimatePresence>
+                  {activeTab === "voice" && (
+                    <motion.button
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      onClick={toggleListening}
+                      className={cn(
+                        "absolute top-4 right-4 p-3.5 rounded-full transition-all shadow-xl",
+                        isListening
+                          ? "bg-red-500 text-white animate-pulse"
+                          : "bg-[var(--panel-bg)] text-[var(--foreground)] hover:bg-blue-600 hover:text-white border border-[var(--panel-border)]"
+                      )}
+                    >
+                      <Volume2 className="w-5 h-5" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 bg-[var(--surface)] border-t border-[var(--panel-border)]">
+                <span className={cn("text-xs font-medium", inputText.length > MAX_CHARS * 0.9 ? "text-red-500" : "text-[var(--text-muted)]")}>
+                  {inputText.length} / {MAX_CHARS}
+                </span>
+                {isListening && (
+                  <span className="text-xs text-red-500 font-medium flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Listening...
+                  </span>
+                )}
+                <button
+                  onClick={() => { setInputText(""); setResult(null); setCurrentEntry(null); setSavedToPhrasebook(false); }}
+                  className="text-xs font-semibold text-[var(--text-muted)] hover:text-red-500 transition-colors uppercase tracking-wider bg-[var(--panel-bg)] border border-[var(--panel-border)] px-3 py-1 rounded"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-4">
+                  <div className="error-alert flex items-start gap-3 rounded-2xl px-5 py-4">
+                    <AlertCircle className="w-6 h-6 text-red-500 shrink-0" />
+                    <div className="flex-1 pt-0.5">
+                      <p className="text-sm font-bold text-[var(--error-title)]">Translation failed</p>
+                      <p className="text-sm text-[var(--error-body)] mt-1">{error}</p>
+                    </div>
+                    <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-500 text-sm">✕</button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Loader or Result */}
+          <AnimatePresence mode="popLayout">
+            {loading && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex justify-center p-8">
+                <div className="w-8 h-8 border-4 border-[var(--panel-border)] border-t-blue-500 rounded-full animate-spin shadow-[0_0_15px_rgba(59,130,246,0.25)]" />
+              </motion.div>
             )}
-          </button>
 
-          {/* Error state */}
-          {error && (
-            <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
-              <span className="text-red-500 text-lg shrink-0">⚠️</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-red-700">Translation failed</p>
-                <p className="text-xs text-red-600 mt-0.5">{error}</p>
-              </div>
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-sm shrink-0">✕</button>
-            </div>
-          )}
+            {!loading && result && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="relative">
+                <div className="glass-panel result-card p-8 rounded-3xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/8 dark:bg-blue-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
 
-          {/* Result Area */}
-          {result && (
-            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Translation</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={speakAloud}
-                    disabled={speakLoading}
-                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 transition-colors disabled:opacity-50"
-                  >
-                    {speakLoading ? "🔊..." : "🔊 Speak"}
-                  </button>
-                  <button
-                    onClick={saveToPhrasebook}
-                    disabled={savedToPhrasebook || savingPhrasebook}
-                    className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                      savedToPhrasebook
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 hover:bg-emerald-100 hover:text-emerald-700 text-slate-600"
-                    }`}
-                  >
-                    {savedToPhrasebook ? "✓ Saved!" : savingPhrasebook ? "Saving..." : "📚 Save to Phrasebook"}
-                  </button>
+                  <div className="flex items-center justify-between mb-6 relative z-10">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-400/20 dark:border-blue-500/20">
+                      <Sparkles className="w-3 h-3 animate-pulse" /> Translation
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={speakAloud}
+                        disabled={speakLoading}
+                        className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] hover:bg-[var(--surface)] text-[var(--foreground)] transition-all disabled:opacity-50 shadow-sm"
+                      >
+                        <Volume2 className={cn("w-4 h-4", speakLoading && "animate-pulse text-blue-500")} />
+                        {speakLoading ? "Speaking" : "Listen"}
+                      </button>
+
+                      <button
+                        onClick={saveToPhrasebook}
+                        disabled={savedToPhrasebook || savingPhrasebook}
+                        className={cn(
+                          "flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border shadow-sm",
+                          savedToPhrasebook
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-400/30 dark:border-emerald-500/30"
+                            : "bg-[var(--panel-bg)] hover:bg-[var(--surface)] border-[var(--panel-border)] text-[var(--foreground)]"
+                        )}
+                      >
+                        {savedToPhrasebook ? <><Check className="w-4 h-4" /> Saved</> : <><Bookmark className="w-4 h-4" /> Save</>}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-3xl md:text-4xl text-[var(--foreground)] font-medium leading-relaxed mb-4 relative z-10">
+                    {result.translated_text}
+                  </p>
+
+                  <CulturalNoteBox result={result} />
                 </div>
-              </div>
-
-              <p className="text-xl text-slate-900 font-medium leading-relaxed mb-2">
-                {result.translated_text}
-              </p>
-
-              <CulturalNoteBox result={result} />
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* ── Sidebar ── */}
-        <aside className="w-72 shrink-0 hidden lg:block">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sticky top-24">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <span>🕐</span> Recent Translations
+        <aside className="w-80 shrink-0 hidden lg:block">
+          <div className="glass-panel p-6 sticky top-28 rounded-3xl">
+            <h3 className="font-bold text-[var(--foreground)] mb-6 flex items-center gap-2 text-lg">
+              History
             </h3>
             {recentTranslations.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <div className="text-3xl mb-2">📝</div>
-                <p className="text-sm">Your recent translations will appear here.</p>
+              <div className="text-center py-10 bg-[var(--surface)] rounded-2xl border border-[var(--panel-border)]">
+                <div className="text-4xl mb-3 opacity-50">📝</div>
+                <p className="text-sm text-[var(--text-muted)]">Your recent translations will appear here.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -487,25 +432,19 @@ export default function TranslatePage() {
                         setCurrentEntry(item);
                         setSavedToPhrasebook(item.isPhrasebook);
                       }}
-                      className="w-full text-left p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors"
+                      className="list-item w-full text-left p-4 rounded-2xl hover:border-blue-400/25 group relative overflow-hidden"
                     >
-                      <p className="text-sm text-slate-700 font-medium truncate">{item.source}</p>
-                      <p className="text-xs text-slate-500 truncate">{item.result.translated_text}</p>
-                      <span className="text-xs text-blue-500 mt-1 inline-block">→ {targetLabel}</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <p className="text-sm text-[var(--foreground)] font-medium truncate mb-1">{item.source}</p>
+                      <p className="text-xs text-[var(--text-secondary)] truncate mb-2">{item.result.translated_text}</p>
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-400/20 dark:border-blue-500/20 inline-block">
+                        {targetLabel}
+                      </span>
                     </button>
                   );
                 })}
               </div>
             )}
-
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <Link
-                href="/phrasebook"
-                className="block text-center text-sm text-blue-600 hover:underline font-medium"
-              >
-                View Phrasebook →
-              </Link>
-            </div>
           </div>
         </aside>
       </div>

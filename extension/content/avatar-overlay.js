@@ -41,6 +41,10 @@
     _resizeStart: { size: 280, mouseX: 0, mouseY: 0 },
     _visible:     true,
     _paused:      false,  // video is paused — hold queue
+    _signQueue:   [],
+    _wordBubble:  null,
+    _avgDuration: 1000,
+    _currentSign: null,
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -300,6 +304,7 @@
     enqueueSign(signConfig) {
       if (this._paused) return;
       this._signQueue.push(signConfig);
+      this._updateAdaptiveSpeed();
       if (!this._animTimer) {
         this._advanceQueue();
       }
@@ -308,9 +313,19 @@
     enqueueSignSequence(signs) {
       if (this._paused) return;
       this._signQueue.push(...signs);
+      this._updateAdaptiveSpeed();
       if (!this._animTimer) {
         this._advanceQueue();
       }
+    },
+
+    _updateAdaptiveSpeed() {
+      // If queue is long, speed up signs to catch up to real-time speech
+      const len = this._signQueue.length;
+      if (len > 8)       this._avgDuration = 450;
+      else if (len > 5)  this._avgDuration = 650;
+      else if (len > 2)  this._avgDuration = 850;
+      else               this._avgDuration = 1000;
     },
 
     _advanceQueue() {
@@ -318,6 +333,7 @@
       if (this._paused) return;
 
       if (this._signQueue.length === 0) {
+        this._hideWordBubble();
         // Show rest pose after 2 seconds of inactivity
         this._animTimer = setTimeout(() => {
           this._renderWithFlash(null);
@@ -327,17 +343,37 @@
       }
 
       const sign = this._signQueue.shift();
+      this._currentSign = sign;
       this._renderWithFlash(sign);
+      this._showWordBubble(sign._word || sign.gloss);
 
       const speed    = this._settings.animationSpeed || 1.0;
+      const adaptive = this._avgDuration / 1000; // Multiplier based on queue length
       const isFinger = sign._isFingerspell;
       const baseDur  = isFinger ? 350 : 900;
-      const duration = Math.round(baseDur / speed);
+      
+      // Combine user setting with real-time adaptive catch-up
+      const duration = Math.round((baseDur * adaptive) / speed);
 
       this._animTimer = setTimeout(() => {
         this._animTimer = null;
         this._advanceQueue();
       }, duration);
+    },
+
+    _showWordBubble(text) {
+      if (!text) return;
+      if (!this._wordBubble) {
+        this._wordBubble = document.createElement('div');
+        this._wordBubble.className = 'sb-word-bubble';
+        this._el.appendChild(this._wordBubble);
+      }
+      this._wordBubble.textContent = text.toLowerCase();
+      this._wordBubble.style.display = 'block';
+    },
+
+    _hideWordBubble() {
+      if (this._wordBubble) this._wordBubble.style.display = 'none';
     },
 
     /**

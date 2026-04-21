@@ -20,7 +20,8 @@
     "https://zoom.us/*",
     "https://meet.google.com/*",
     "https://teams.microsoft.com/*",
-    "https://teams.live.com/*"
+    "https://teams.live.com/*",
+    "https://teams.cloud.microsoft/*"
   ],
 
   "background": {
@@ -34,7 +35,8 @@
         "https://zoom.us/*",
         "https://meet.google.com/*",
         "https://teams.microsoft.com/*",
-        "https://teams.live.com/*"
+        "https://teams.live.com/*",
+        "https://teams.cloud.microsoft/*"
       ],
       "js": [
         "content/platform-detector.js",
@@ -46,7 +48,8 @@
         "content/content-script.js"
       ],
       "css": ["content/overlay.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
 
@@ -72,13 +75,14 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["content/overlay.css", "icons/*", "content/vocab-10k.js"],
+      "resources": ["content/overlay.css", "icons/*", "content/vocab-10k.json"],
       "matches": [
         "https://www.youtube.com/*",
         "https://zoom.us/*",
         "https://meet.google.com/*",
         "https://teams.microsoft.com/*",
-        "https://teams.live.com/*"
+        "https://teams.live.com/*",
+        "https://teams.cloud.microsoft/*"
       ]
     }
   ],

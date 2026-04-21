@@ -155,6 +155,22 @@ final class HistoryRepository
     }
 
     /**
+     * @param array<string, mixed> $extra
+     */
+    public function updateExtraJson(string $id, array $extra): array
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE history_entries SET extra_json = :extra_json WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $id,
+            'extra_json' => json_encode($extra, JSON_UNESCAPED_UNICODE),
+        ]);
+
+        return $this->require($id);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function require(string $id): array
@@ -199,6 +215,7 @@ final class HistoryRepository
             'sentiment' => is_array($sentiment) ? $sentiment : null,
             'metadata' => is_array($metadata) ? $metadata : [],
             'wordSequence' => isset($extra['word_sequence']) && is_array($extra['word_sequence']) ? $extra['word_sequence'] : [],
+            'extra' => is_array($extra) ? $extra : [],
         ];
     }
 

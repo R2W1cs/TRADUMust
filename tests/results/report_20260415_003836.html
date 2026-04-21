@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TraduMust Test Report — 20260415_003836</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:#e2e8f0; padding:2rem }
+  h1 { font-size:2rem; margin-bottom:0.5rem; color:#a78bfa }
+  .meta { color:#94a3b8; margin-bottom:1.5rem; font-size:0.9rem }
+  .summary { display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap }
+  .card { background:#1e2130; border-radius:12px; padding:1.2rem 2rem; min-width:120px; text-align:center }
+  .card .num { font-size:2.5rem; font-weight:700 }
+  .card.pass .num { color:#4ade80 }
+  .card.fail .num { color:#f87171 }
+  .card.skip .num { color:#fbbf24 }
+  .card.total .num { color:#a78bfa }
+  table { width:100%; border-collapse:collapse }
+  th { background:#1e2130; padding:0.75rem; text-align:left; color:#94a3b8; font-size:0.85rem }
+  td { padding:0.75rem; border-bottom:1px solid #2d3452; font-size:0.875rem; vertical-align:top }
+  tr.pass { background:#0f2820 }
+  tr.fail { background:#2d0f0f }
+  tr.skip { background:#2d2a0f }
+  .status { font-weight:700; white-space:nowrap }
+  pre { background:#0a0c14; padding:0.75rem; border-radius:8px; overflow:auto; font-size:0.75rem; max-height:300px; margin-top:0.5rem }
+  details summary { cursor:pointer; color:#60a5fa }
+</style>
+</head>
+<body>
+<h1>🧪 TraduMust Test Report</h1>
+<p class="meta">Generated: 2026-04-15T00:38:36.273385Z &nbsp;|&nbsp; Total time: 164.7s &nbsp;|&nbsp; Pass rate: 92.9%</p>
+<div class="summary">
+  <div class="card total"><div class="num">14</div><div>Total</div></div>
+  <div class="card pass"><div class="num">13</div><div>Passed</div></div>
+  <div class="card fail"><div class="num">1</div><div>Failed</div></div>
+  <div class="card skip"><div class="num">0</div><div>Skipped</div></div>
+</div>
+<table>
+<thead><tr><th>Suite</th><th>Status</th><th>Time</th><th>Output</th></tr></thead>
+<tbody>
+        <tr class="pass">
+          <td>Backend API Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>61.88s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 98 items
+
+tests\backend\test_api.py .............................................. [ 46%]
+....................................................                     [100%]
+
+======================== 98 passed in 60.61s (0:01:00) ========================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Contract Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>12.52s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 15 items
+
+tests\backend\test_contracts.py ...............                          [100%]
+
+============================= 15 passed in 11.33s =============================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Security Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>17.24s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 20 items
+
+tests\backend\test_security.py ....................                      [100%]
+
+============================= 20 passed in 16.07s =============================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>ML Feature Extractor Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>2.79s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 27 items
+
+tests\ml\test_feature_extractor.py ...........................           [100%]
+
+============================= 27 passed in 2.04s ==============================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>ML Pipeline Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>25.14s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 49 items
+
+tests\ml\test_ml_pipeline.py ........................................... [ 87%]
+......                                                                   [100%]
+
+============================== warnings summary ===============================
+tests/ml/test_ml_pipeline.py::TestMLAPI::test_train_endpoint_smoke
+  C:\Users\rayen\TraduMust\.venv\Lib\site-packages\starlette\testclient.py:439: DeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 49 passed, 1 warning in 23.84s ========================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Load Tests (Python)</td>
+          <td class="status">✅ PASS</td>
+          <td>38.35s</td>
+          <td><details><summary>output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Users\rayen\TraduMust
+plugins: anyio-4.13.0
+collected 17 items
+
+tests\load\backend_load_test.py .................                        [100%]
+
+============================= 17 passed in 36.87s =============================
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Unit: Sign Mapper</td>
+          <td class="status">✅ PASS</td>
+          <td>0.13s</td>
+          <td><details><summary>output</summary><pre>ion (0.0808ms)
+  ✔ each sign has a _key annotation (0.0467ms)
+✔ textToSigns — direct lookup (1.6874ms)
+▶ textToSigns — Porter stemmer fallback
+  ✔ "studying" stems to study → STUDY (0.0824ms)
+  ✔ "beautiful" stems → BEAUTIFUL (0.0495ms)
+  ✔ "running" → action sign (GO or __ACTION via stem) (0.0306ms)
+✔ textToSigns — Porter stemmer fallback (0.2276ms)
+▶ textToSigns — ASL grammar reordering
+  ✔ time word "today" is moved to front (0.1134ms)
+  ✔ WH-question word "what" is moved to end (0.0732ms)
+✔ textToSigns — ASL grammar reordering (0.2268ms)
+▶ textToSigns — question non-manual markers
+  ✔ WH-question sets expression to WH_QUESTION (0.078ms)
+  ✔ Yes/No question sets expression to QUESTION (0.0568ms)
+  ✔ statement uses NEUTRAL or sign-specific expression (0.0412ms)
+✔ textToSigns — question non-manual markers (0.2343ms)
+▶ textToSigns — fingerspelling fallback
+  ✔ completely unknown word is fingerspelled (0.196ms)
+  ✔ fingerspelled signs have category=fingerspelling (0.126ms)
+  ✔ fingerspelled sign length equals word length (0.0782ms)
+✔ textToSigns — fingerspelling fallback (0.4581ms)
+▶ _sbPOS suffix-based tagger
+  ✔ "quickly" → ADV (0.0807ms)
+  ✔ "beautiful" → ADJ (0.073ms)
+  ✔ "running" → VERB (0.0644ms)
+  ✔ "jumped" → VERB (0.0665ms)
+  ✔ "teacher" → NOUN (0.0591ms)
+  ✔ "education" → NOUN (0.0311ms)
+  ✔ "cat" → UNKNOWN (0.0362ms)
+✔ _sbPOS suffix-based tagger (0.6662ms)
+▶ SignMapper public API
+  ✔ getSignInfo("HELLO") returns sign config (0.0809ms)
+  ✔ getSignInfo("UNKNOWN_XYZ") returns null (0.0328ms)
+  ✔ getCategory("greetings") returns array of signs (0.1254ms)
+  ✔ getCategories() returns non-empty array of strings (0.0717ms)
+  ✔ getCategories() contains expected categories (0.0527ms)
+✔ SignMapper public API (0.438ms)
+▶ STEMMED_INDEX
+  ✔ STEMMED_INDEX enables "studying" → LEARN (0.0547ms)
+  ✔ STEMMED_INDEX enables "working" → WORK (0.0541ms)
+✔ STEMMED_INDEX (0.1573ms)
+ℹ tests 46
+ℹ suites 11
+ℹ pass 46
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86.0016
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Unit: Vocab 10k</td>
+          <td class="status">✅ PASS</td>
+          <td>0.11s</td>
+          <td><details><summary>output</summary><pre>[SignBridge] VOCAB_EXT loaded: 2597 entries
+▶ vocab-10k.js loading
+  ✔ VOCAB_EXT object is defined after load (0.375ms)
+  ✔ VOCAB_EXT has substantial number of entries (≥ 2000) (0.2807ms)
+  ✔ all VOCAB_EXT values reference valid SIGNS keys (0.9372ms)
+✔ vocab-10k.js loading (2.163ms)
+▶ vocab-10k.js semantic coverage
+  ✔ 'analyze' maps to THINK (0.187ms)
+  ✔ 'comprehension' maps to KNOW (0.0731ms)
+  ✔ 'collaborate' maps to HELP (0.043ms)
+  ✔ 'accomplish' maps to WORK (0.0438ms)
+  ✔ 'demonstrate' maps to SHOW (0.0718ms)
+  ✔ 'communicate' maps to SHOW (0.0648ms)
+  ✔ 'transportation' maps to CAR (0.1096ms)
+  ✔ 'residence' maps to HOME (0.0972ms)
+  ✔ 'currency' maps to MONEY (0.0891ms)
+  ✔ 'precipitation' maps to RAIN (0.0938ms)
+  ✔ 'consume' maps to EAT (0.0264ms)
+  ✔ 'physician' maps to DOCTOR (0.0446ms)
+  ✔ 'additional' maps to MORE (0.0332ms)
+  ✔ 'attempt' maps to TRY (0.0302ms)
+  ✔ 'utilize' maps to USE (0.0201ms)
+  ✔ 'recall' maps to REMEMBER (0.0209ms)
+✔ vocab-10k.js semantic coverage (1.4426ms)
+▶ vocab-10k.js does not duplicate WORD_TO_SIGN
+  ✔ fewer than 5% of vocab-10k words also exist in WORD_TO_SIGN (0.5605ms)
+✔ vocab-10k.js does not duplicate WORD_TO_SIGN (0.6032ms)
+ℹ tests 20
+ℹ suites 3
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76.5765
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Unit: Signer2D</td>
+          <td class="status">✅ PASS</td>
+          <td>0.11s</td>
+          <td><details><summary>output</summary><pre>▶ Coordinate system consistency with Signer2D.tsx
+  ✔ REST_R matches Signer2D.tsx rest position (0.4302ms)
+  ✔ REST_L matches Signer2D.tsx rest position (0.0976ms)
+  ✔ right arm signs are in right-side of ViewBox (x > 180) (0.1691ms)
+  ✔ two-handed signs have both left and right arms (0.1343ms)
+✔ Coordinate system consistency with Signer2D.tsx (1.4272ms)
+▶ CSS motion classes
+  ✔ all rMotion values are valid CSS class names (0.1602ms)
+  ✔ all lMotion values are valid CSS class names (0.1084ms)
+✔ CSS motion classes (0.3582ms)
+▶ Sign educational content
+  ✔ every non-meta sign has a description (0.1745ms)
+  ✔ every non-meta sign has a culturalNote (0.1759ms)
+✔ Sign educational content (0.4673ms)
+▶ Fingerspelling alphabet
+  ✔ FINGERSPELL_HANDS contains all 26 letters (0.1ms)
+  ✔ all FINGERSPELL_HANDS values are valid hand shapes (0.1842ms)
+✔ Fingerspelling alphabet (0.349ms)
+▶ textToSigns — web-app representative sentences
+  ✔ "hello my name is Alex" (greeting with name phrase) contains expected signs (0.6642ms)
+  ✔ "where is the school?" (WH-question location (school sign exists)) contains expected signs (0.0953ms)
+  ✔ "I am sick please help" (health emergency phrase) contains expected signs (0.1101ms)
+  ✔ "today is monday morning" (time-marking sentence) contains expected signs (0.0763ms)
+  ✔ "I love you" (emotional expression) contains expected signs (0.0404ms)
+✔ textToSigns — web-app representative sentences (1.0877ms)
+ℹ tests 15
+ℹ suites 5
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 74.6175
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Dynamic / Fuzz Tests</td>
+          <td class="status">✅ PASS</td>
+          <td>0.3s</td>
+          <td><details><summary>output</summary><pre>icode / Emoji / RTL inputs (0.9595ms)
+▶ Property-based invariants (500 samples each)
+  ✔ INV: result is always array (8.0672ms)
+  ✔ INV: every result sign has _key and _word (4.6951ms)
+  ✔ INV: no sign has undefined right/rHand if not fingerspell (0.5146ms)
+  ✔ INV: fingerspelled signs have category=fingerspelling (0.1758ms)
+  ✔ INV: output length is stable for identical input (idempotency) (0.1914ms)
+  ✔ INV: sign keys reference entries in SIGNS dict (0.4578ms)
+✔ Property-based invariants (500 samples each) (14.3231ms)
+▶ Boundary value analysis
+  ✔ single character inputs (0.3591ms)
+  ✔ maximum realistic sentence length (200 words) (0.475ms)
+  ✔ sentence with ALL known words (dictionary coverage) (13.6132ms)
+  ✔ single word from every category maps correctly (0.9167ms)
+  ✔ empty word between spaces does not produce extra signs (0.1702ms)
+✔ Boundary value analysis (15.6734ms)
+▶ ASL grammar invariants
+  ✔ time words always appear before non-time words (0.1704ms)
+  ✔ WH-question words are placed near end (0.409ms)
+  ✔ question sentences end with QUESTION or WH_QUESTION expression (0.1125ms)
+✔ ASL grammar invariants (0.779ms)
+▶ Performance benchmarks (must be fast enough)
+  ✔ single known word lookup < 1ms average (1.6267ms)
+  ✔ 10-word sentence < 5ms average (3.7923ms)
+  ✔ unknown word fingerspell < 2ms average (5 chars) (2.0238ms)
+  ✔ getSignInfo lookup < 0.05ms average (0.3067ms)
+✔ Performance benchmarks (must be fast enough) (7.864ms)
+▶ Regression tests (known past bugs)
+  ✔ REG-001: "pink" maps to RED not BLUE (0.071ms)
+  ✔ REG-002: "thank you" (multi-word) is a single sign, not "thank" + "you" (0.0869ms)
+  ✔ REG-003: empty string returns [] not null/undefined (0.0611ms)
+  ✔ REG-004: categories include fingerspelling (0.0821ms)
+  ✔ REG-005: ARM coordinates — no coordinate exactly at 0,0 (boundary regression) (0.2095ms)
+✔ Regression tests (known past bugs) (0.5919ms)
+ℹ tests 29
+ℹ suites 7
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 263.1142
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Integration: Pipeline</td>
+          <td class="status">✅ PASS</td>
+          <td>0.12s</td>
+          <td><details><summary>output</summary><pre> as core WORD_TO_SIGN (0.1379ms)
+✔ Integration: vocab-10k.js ↔ sign-mapper.js SIGNS (2.4947ms)
+▶ Integration: Stemmer → WORD_TO_SIGN → VOCAB_EXT fallback chain
+  ✔ step 1 — direct WORD_TO_SIGN hit skips stemmer (0.1169ms)
+  ✔ step 2 — stemmer finds root in WORD_TO_SIGN (studying → study → STUDY) (0.0759ms)
+  ✔ step 3 — vocab-10k word resolves to THINK sign (0.074ms)
+  ✔ step 4 — POS fallback when nothing found (adjective suffix → __MODIFIER) (0.2361ms)
+  ✔ step 5 — fingerspell as final fallback for truly unknown words (0.2832ms)
+✔ Integration: Stemmer → WORD_TO_SIGN → VOCAB_EXT fallback chain (0.9689ms)
+▶ Integration: grammar reordering + expression marking
+  ✔ WH-question: "what" moved to end AND expression = WH_QUESTION (0.1623ms)
+  ✔ time word moves to front AND sentence still produces all signs (0.1958ms)
+  ✔ mixed sentence: time + WH + regular words all produce signs (0.1208ms)
+✔ Integration: grammar reordering + expression marking (0.6115ms)
+▶ Integration: multi-word phrase detection
+  ✔ "thank you" → single THANK_YOU sign (not two separate signs) (0.0776ms)
+  ✔ "my name" → single NAME sign (phrase takes priority) (0.0728ms)
+  ✔ longer sentence preserves phrase detection in context (0.2087ms)
+✔ Integration: multi-word phrase detection (0.4241ms)
+▶ Integration: real caption scenarios
+  ✔ "Zoom lecture — professor introduces topic" (0.1752ms)
+  ✔ "Google Meet — student asks for help" (0.0715ms)
+  ✔ "YouTube — weather forecast" (0.0768ms)
+  ✔ "Teams — health emergency" (0.0589ms)
+  ✔ "Mixed vocab — uses vocab-10k for academic words" (0.0361ms)
+✔ Integration: real caption scenarios (0.4944ms)
+▶ Integration: shared window.SignBridge namespace
+  ✔ both modules coexist under window.SignBridge (0.4066ms)
+  ✔ vocab-10k did not overwrite SignMapper (0.0552ms)
+  ✔ sign-mapper did not overwrite VOCAB_EXT (0.2165ms)
+✔ Integration: shared window.SignBridge namespace (0.7298ms)
+ℹ tests 22
+ℹ suites 6
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 84.1664
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Performance: Sign Mapper</td>
+          <td class="status">✅ PASS</td>
+          <td>0.38s</td>
+          <td><details><summary>output</summary><pre>e-built with ≥ 2000 entries (0.294ms)
+✔ Module load time (26.85ms)
+▶ Dictionary lookup performance (O(1))
+  ✔ WORD_TO_SIGN hit lookup ≥ 2,000,000 ops/sec (0.718ms)
+  ✔ WORD_TO_SIGN miss lookup ≥ 2,000,000 ops/sec (0.818ms)
+  ✔ SIGNS direct lookup ≥ 2,000,000 ops/sec (0.4148ms)
+  ✔ VOCAB_EXT lookup ≥ 2,000,000 ops/sec (0.481ms)
+✔ Dictionary lookup performance (O(1)) (2.7367ms)
+▶ Single-word textToSigns performance
+  ✔ known word ("hello") ≥ 100,000 ops/sec (5.7044ms)
+  ✔ stemmer path ("studying") ≥ 80,000 ops/sec (6.4415ms)
+  ✔ fingerspell fallback ("xyzqq") ≥ 15,000 ops/sec (13.8351ms)
+  ✔ skip word ("the") faster than known word lookup (7.0444ms)
+✔ Single-word textToSigns performance (33.2568ms)
+▶ Sentence pipeline performance
+  ✔ "hello my name is Alex…" (5w) ≥ 10,000 ops/sec (18.7927ms)
+  ✔ "I am sick please help me today…" (7w) ≥ 10,000 ops/sec (15.7897ms)
+  ✔ "where is the nearest school or library…" (7w) ≥ 10,000 ops/sec (19.9392ms)
+  ✔ "what time does the morning class start tomorr…" (8w) ≥ 10,000 ops/sec (13.6732ms)
+  ✔ "I want to learn sign language and communicate…" (11w) ≥ 10,000 ops/sec (29.3114ms)
+✔ Sentence pipeline performance (97.6999ms)
+▶ End-to-end throughput (must beat real-time speech)
+  ✔ throughput ≥ 100,000 words/sec (40000× real-time speech) (54.1584ms)
+  ✔ latency per sentence < 1ms (real-time caption sync) (22.6214ms)
+✔ End-to-end throughput (must beat real-time speech) (76.9262ms)
+▶ Sub-component performance
+  ✔ _normalizeAndTokenize ≥ 50,000 ops/sec (9.6032ms)
+  ✔ _applyAslGrammar ≥ 100,000 ops/sec (4.8961ms)
+✔ Sub-component performance (14.5893ms)
+▶ Data structure size (coverage requirements)
+  ✔ SIGNS dictionary has ≥ 200 entries (0.2408ms)
+  ✔ WORD_TO_SIGN has ≥ 2000 entries (0.3013ms)
+  ✔ VOCAB_EXT has ≥ 2000 entries (0.3641ms)
+  ✔ combined coverage ≥ 4000 word mappings (0.4611ms)
+✔ Data structure size (coverage requirements) (1.4786ms)
+ℹ tests 24
+ℹ suites 7
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 342.8917
+</pre></details></td>
+        </tr>
+        <tr class="pass">
+          <td>Stress: Sign Mapper</td>
+          <td class="status">✅ PASS</td>
+          <td>0.23s</td>
+          <td><details><summary>output</summary><pre>uts — graceful degradation
+  ✔ "empty string" does not throw (0.2197ms)
+  ✔ "only spaces" does not throw (0.0644ms)
+  ✔ "only punctuation" does not throw (0.0632ms)
+  ✔ "only skip words" does not throw (0.0719ms)
+  ✔ "numbers as text" does not throw (0.1248ms)
+  ✔ "unicode emoji" does not throw (0.2752ms)
+  ✔ "repeated word x100" does not throw (0.1855ms)
+  ✔ "null-like string" does not throw (0.0857ms)
+  ✔ "mixed case" does not throw (0.0425ms)
+  ✔ "newlines/tabs" does not throw (0.0574ms)
+  ✔ "very short words" does not throw (0.0446ms)
+  ✔ "all caps" does not throw (0.0329ms)
+  ✔ null input returns empty array (not throw) (0.0553ms)
+  ✔ undefined input returns empty array (not throw) (0.1938ms)
+  ✔ number input returns empty array (not throw) (0.0691ms)
+✔ Stress: edge case inputs — graceful degradation (2.365ms)
+▶ Stress: repeated calls — state stability
+  ✔ 10,000 calls return same result for same input (46.4585ms)
+  ✔ alternating WH and YN questions do not corrupt expression state (2.8305ms)
+  ✔ SIGNS dictionary not mutated by repeated textToSigns calls (15.6884ms)
+  ✔ WORD_TO_SIGN not mutated by repeated calls (9.4385ms)
+✔ Stress: repeated calls — state stability (74.5932ms)
+▶ Stress: rapid caption stream simulation
+  ✔ 1000 different sentences in sequence — all return arrays (6.6623ms)
+  ✔ interleaved known / unknown / fingerspell — no cross-contamination (2.6508ms)
+✔ Stress: rapid caption stream simulation (9.4363ms)
+▶ Stress: stemmer under many inflected forms
+  ✔ all inflected forms produce a valid sign (not fingerspell) (0.1685ms)
+  ✔ 5000 stemmer calls with rotating inflections stay consistent (3.7731ms)
+✔ Stress: stemmer under many inflected forms (4.0272ms)
+▶ Stress: interleaved calls simulate concurrent access
+  ✔ interleaved calls from "multiple users" give independent results (2.0171ms)
+✔ Stress: interleaved calls simulate concurrent access (2.1999ms)
+ℹ tests 28
+ℹ suites 6
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 189.2499
+</pre></details></td>
+        </tr>
+        <tr class="fail">
+          <td>k6 Smoke Test</td>
+          <td class="status">❌ FAIL</td>
+          <td>5.39s</td>
+          <td><details><summary>output</summary><pre>ook/save: 200
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/save: entry.id
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/save: isPhrasebook
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/list: 200
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/list: has data
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/patch: 200
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/delete: 200
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook/delete: deleted
+      ↳  0% — ✓ 0 / ✗ 1
+    ✗ phrasebook: empty history_id → 422
+      ↳  0% — ✓ 0 / ✗ 1
+    ✓ phrasebook: unknown id → 404
+
+    CUSTOM
+    api_success_rate...............: 100.00% 16 out of 16
+    history_latency_ms.............: avg=3ms      min=3ms      med=3ms      max=3ms      p(90)=3ms      p(95)=3ms     
+    phrasebook_latency_ms..........: avg=0s       min=0s       med=0s       max=0s       p(90)=0s       p(95)=0s      
+    text_to_sign_latency_ms........: avg=2.5ms    min=2ms      med=2.5ms    max=3ms      p(90)=3ms      p(95)=3ms     
+    translate_latency_ms...........: avg=408.6ms  min=1ms      med=446.5ms  max=483ms    p(90)=477.6ms  p(95)=480.3ms 
+
+    HTTP
+    http_req_duration..............: avg=178.83ms min=0s       med=2.17ms   max=483.04ms p(90)=459.27ms p(95)=473.94ms
+      { expected_response:true }...: avg=263.21ms min=507.29µs med=438.24ms max=483.04ms p(90)=470.1ms  p(95)=477.54ms
+    http_req_failed................: 32.14%  9 out of 28
+    http_reqs......................: 28      5.580171/s
+
+    EXECUTION
+    iteration_duration.............: avg=5.01s    min=5.01s    med=5.01s    max=5.01s    p(90)=5.01s    p(95)=5.01s   
+    iterations.....................: 1       0.199292/s
+    vus............................: 1       min=1        max=1
+    vus_max........................: 1       min=1        max=1
+
+    NETWORK
+    data_received..................: 14 kB   2.7 kB/s
+    data_sent......................: 4.5 kB  897 B/s
+
+
+
+
+running (00m05.0s), 0/1 VUs, 1 complete and 0 interrupted iterations
+default ✓ [ 100% ] 1 VUs  00m05.0s/10m0s  1/1 shared iters
+</pre></details></td>
+        </tr></tbody>
+</table>
+</body>
+</html>

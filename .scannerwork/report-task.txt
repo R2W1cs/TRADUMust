@@ -1,0 +1,6 @@
+projectKey=tradumust
+serverUrl=http://localhost:9000
+serverVersion=26.4.0.121862
+dashboardUrl=http://localhost:9000/dashboard?id=tradumust
+ceTaskId=bd3b8d0b-8b18-434b-8b20-679afa6c5c7a
+ceTaskUrl=http://localhost:9000/api/ce/task?id=bd3b8d0b-8b18-434b-8b20-679afa6c5c7a
