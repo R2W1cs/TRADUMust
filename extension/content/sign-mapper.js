@@ -2914,6 +2914,15 @@
 
     _loadExtVocab() {
       if (this._extVocabLoaded || this._extVocabLoading) return;
+
+      // Defensive check for non-browser/test environments
+      if (typeof fetch === 'undefined' || typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
+        console.warn('[SignBridge] Extended vocab loading skipped: environment not supported (expected in unit tests).');
+        this._extVocab = {}; 
+        this._extVocabLoaded = true;
+        return;
+      }
+
       this._extVocabLoading = true;
       const url = chrome.runtime.getURL('content/vocab-10k.json');
       fetch(url)
@@ -2926,6 +2935,7 @@
         .catch(err => {
           console.error('[SignBridge] Failed to load extended vocab:', err);
           this._extVocabLoading = false;
+          this._extVocab = {}; // Fallback to empty to avoid repeated fails
         });
     },
 

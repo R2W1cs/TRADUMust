@@ -20,7 +20,10 @@ const path   = require('node:path');
 // Load extension sign-mapper (the sign dict mirrors Signer2D.tsx)
 const ctx = {
   window: { SignBridge: {} },
-  chrome: { runtime: { getURL: () => '' } },
+  chrome: { runtime: { getURL: () => 'mock://vocab-10k.json' } },
+  fetch: (url) => Promise.resolve({
+    json: () => Promise.resolve(JSON.parse(fs.readFileSync(path.join(__dirname, '../../extension/content/vocab-10k.json'), 'utf8')))
+  }),
   document: {
     createElement: () => ({ src: '', onload: null, onerror: null }),
     head: { appendChild: () => {} },

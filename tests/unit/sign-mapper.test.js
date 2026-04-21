@@ -19,7 +19,10 @@ const code = fs.readFileSync(MAPPER_PATH, 'utf8');
 
 const ctx = {
   window: { SignBridge: {} },
-  chrome: { runtime: { getURL: () => 'mock://vocab-10k.js' } },
+  chrome: { runtime: { getURL: () => 'mock://vocab-10k.json' } },
+  fetch: (url) => Promise.resolve({
+    json: () => Promise.resolve(JSON.parse(fs.readFileSync(path.join(__dirname, '../../extension/content/vocab-10k.json'), 'utf8')))
+  }),
   document: {
     createElement: (tag) => {
       const el = { src: '', onload: null, onerror: null };
