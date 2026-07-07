@@ -47,7 +47,21 @@ desktop.ini
 
 # --- Large ML data ---
 data/
+!data/tsl/
+!data/tsl/vocabulary.json
 backend/ml/wlasl_features/
+backend/ml/tsl_features/
 
-# --- Training artifacts ---
-backend/ml/__pycache__/
+# --- CWASA cached binaries (run npm run cwasa:cache) ---
+public/asl-avatar/cwa/allcsa.js
+public/asl-avatar/cwa/cwasa.css
+public/asl-avatar/cwa/cwacfg.json
+public/asl-avatar/avatars/
+
+# --- Scrape / temp ---
+.firecrawl/
+.tmp/
+wlasl-processed.zip
+backend/ml/trained_bert.pt
+backend/ml/trained_lstm.pt
+backend/ml/trained_mlp.pt

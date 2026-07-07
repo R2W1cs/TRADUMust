@@ -26,7 +26,8 @@ interface ArmPose { elbow: Pt; wrist: Pt; }
 
 type HandKey =
   | "FLAT" | "FIST" | "POINT" | "V" | "C" | "OK"
-  | "THUMB_UP" | "ILY" | "CLAW" | "HORNS" | "L" | "A" | "O";
+  | "THUMB_UP" | "ILY" | "CLAW" | "HORNS" | "L" | "A" | "O"
+  | "I_LET" | "R_LET";
 
 interface SignConfig {
   right: ArmPose;
@@ -122,6 +123,73 @@ const SIGNS: Record<string, SignConfig> = {
     rMotion: "motion-roll", lMotion: "motion-roll",
     hint: "Both CLAWs roll knuckles-up",
   },
+  YOU: {
+    /* ASL YOU — index points at the listener, arm extended forward */
+    right: { elbow: { x: 278, y: 102 }, wrist: { x: 322, y: 82  } },
+    rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-you",
+    hint: "Index points straight at the person you're talking to",
+  },
+  ME: {
+    /* ASL ME / I — index points to self at chest */
+    right: { elbow: { x: 238, y: 122 }, wrist: { x: 210, y: 138 } },
+    rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-to-self",
+    hint: "Index points to your own chest",
+  },
+  ARE: {
+    right: { elbow: { x: 248, y: 105 }, wrist: { x: 228, y: 92  } },
+    left:  { elbow: { x: 112, y: 105 }, wrist: { x: 132, y: 92  } },
+    rHand: "V", lHand: "FLAT", expression: "QUESTION", rMotion: "motion-roll",
+    hint: "R-hand on flat palm, roll forward",
+  },
+  FINE: {
+    right: { elbow: { x: 265, y: 105 }, wrist: { x: 268, y: 72  } },
+    rHand: "THUMB_UP", expression: "HAPPY", rMotion: "motion-nod",
+    hint: "Thumb up — I'm fine",
+  },
+  WELL: {
+    right: { elbow: { x: 248, y: 115 }, wrist: { x: 222, y: 105 } },
+    rHand: "FLAT", expression: "NEUTRAL", rMotion: "motion-push",
+    hint: "Flat hand lifts from chest",
+  },
+  MORNING: {
+    right: { elbow: { x: 248, y: 85  }, wrist: { x: 222, y: 58  } },
+    left:  { elbow: { x: 112, y: 115 }, wrist: { x: 132, y: 128 } },
+    rHand: "FLAT", lHand: "FLAT", expression: "NEUTRAL", rMotion: "motion-lift",
+    hint: "Flat hand rises from opposite arm",
+  },
+  NIGHT: {
+    right: { elbow: { x: 248, y: 110 }, wrist: { x: 228, y: 96  } },
+    left:  { elbow: { x: 112, y: 110 }, wrist: { x: 132, y: 96  } },
+    rHand: "FLAT", lHand: "FLAT", expression: "NEUTRAL", rMotion: "motion-pull",
+    hint: "Flat hands fold down over eyes",
+  },
+  // Fingerspell alphabet — distinct hand shapes per letter
+  S: { right: { elbow: { x: 252, y: 118 }, wrist: { x: 235, y: 130 } }, rHand: "FIST", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Closed fist — letter S" },
+  I: { right: { elbow: { x: 258, y: 100 }, wrist: { x: 238, y: 78  } }, rHand: "I_LET", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Pinky up — letter I" },
+  R: { right: { elbow: { x: 258, y: 105 }, wrist: { x: 238, y: 88  } }, rHand: "R_LET", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Crossed index & middle — letter R" },
+  A: { right: { elbow: { x: 255, y: 115 }, wrist: { x: 238, y: 125 } }, rHand: "A", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Thumb out — letter A" },
+  B: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 88  } }, rHand: "FLAT", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Flat fingers up — letter B" },
+  C: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 92  } }, rHand: "C", expression: "NEUTRAL", rMotion: "motion-hold", hint: "C shape — letter C" },
+  D: { right: { elbow: { x: 265, y: 105 }, wrist: { x: 268, y: 72  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Index up — letter D" },
+  E: { right: { elbow: { x: 255, y: 115 }, wrist: { x: 238, y: 125 } }, rHand: "FIST", expression: "NEUTRAL", rMotion: "motion-hold", hint: "All fingers curled — letter E" },
+  F: { right: { elbow: { x: 255, y: 108 }, wrist: { x: 232, y: 95  } }, rHand: "OK", expression: "NEUTRAL", rMotion: "motion-hold", hint: "OK shape — letter F" },
+  G: { right: { elbow: { x: 272, y: 105 }, wrist: { x: 292, y: 88  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-g-slide", hint: "Index sideways — letter G" },
+  H: { right: { elbow: { x: 272, y: 105 }, wrist: { x: 292, y: 88  } }, rHand: "V", expression: "NEUTRAL", rMotion: "motion-g-slide", hint: "V sideways — letter H" },
+  J: { right: { elbow: { x: 265, y: 105 }, wrist: { x: 268, y: 78  } }, rHand: "I_LET", expression: "NEUTRAL", rMotion: "motion-j-hook", hint: "Pinky traces J in air" },
+  K: { right: { elbow: { x: 272, y: 100 }, wrist: { x: 292, y: 82  } }, rHand: "V", expression: "NEUTRAL", rMotion: "motion-hold", hint: "V on thumb — letter K" },
+  L: { right: { elbow: { x: 272, y: 105 }, wrist: { x: 292, y: 88  } }, rHand: "L", expression: "NEUTRAL", rMotion: "motion-hold", hint: "L shape — letter L" },
+  M: { right: { elbow: { x: 252, y: 118 }, wrist: { x: 228, y: 132 } }, rHand: "FIST", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Three fingers over thumb — letter M" },
+  N: { right: { elbow: { x: 252, y: 118 }, wrist: { x: 228, y: 132 } }, rHand: "FIST", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Two fingers over thumb — letter N" },
+  O: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 92  } }, rHand: "O", expression: "NEUTRAL", rMotion: "motion-hold", hint: "O shape — letter O" },
+  P: { right: { elbow: { x: 272, y: 100 }, wrist: { x: 292, y: 78  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-hold", hint: "P shape downward — letter P" },
+  Q: { right: { elbow: { x: 272, y: 100 }, wrist: { x: 292, y: 78  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Q shape — letter Q" },
+  T: { right: { elbow: { x: 252, y: 118 }, wrist: { x: 235, y: 130 } }, rHand: "FIST", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Thumb between index & middle — letter T" },
+  U: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 88  } }, rHand: "HORNS", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Index & middle up — letter U" },
+  V: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 88  } }, rHand: "V", expression: "NEUTRAL", rMotion: "motion-hold", hint: "V shape — letter V" },
+  W: { right: { elbow: { x: 255, y: 105 }, wrist: { x: 232, y: 88  } }, rHand: "CLAW", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Three fingers up — letter W" },
+  X: { right: { elbow: { x: 255, y: 108 }, wrist: { x: 232, y: 95  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-shake", hint: "Hooked index — letter X" },
+  Y: { right: { elbow: { x: 272, y: 105 }, wrist: { x: 292, y: 88  } }, rHand: "THUMB_UP", expression: "NEUTRAL", rMotion: "motion-hold", hint: "Thumb & pinky out — letter Y" },
+  Z: { right: { elbow: { x: 272, y: 105 }, wrist: { x: 292, y: 88  } }, rHand: "POINT", expression: "NEUTRAL", rMotion: "motion-z-draw", hint: "Index draws Z in the air" },
   HELP: {
     right: { elbow: { x: 248, y: 105 }, wrist: { x: 228, y: 92  } },
     left:  { elbow: { x: 105, y: 112 }, wrist: { x: 128, y: 100 } },
@@ -348,6 +416,25 @@ function HandO() {
     <Palm w={22} h={11}/>
   </g>;
 }
+function HandILetter() {
+  return <g>
+    <Palm w={26} h={17}/>
+    <Finger cx={-8} rootY={-7} tipY={-32} width={4.5}/>
+    <Knuckle cx={-2.5} y={-9}/><Knuckle cx={2.5} y={-9}/><Knuckle cx={8} y={-8}/>
+    <path d="M -13 2 Q -20 0 -20 7" stroke={SK} strokeWidth="5.5" strokeLinecap="round" fill="none"/>
+  </g>;
+}
+function HandRLetter() {
+  return <g>
+    <Palm/>
+    <Finger cx={6} rootY={-7} tipY={-33} width={5}/>
+    <g transform="rotate(-18 0 -17)">
+      <Finger cx={0} rootY={-7} tipY={-28} width={5}/>
+    </g>
+    <Knuckle cx={-8} y={-8}/>
+    <path d="M -13 2 Q -20 0 -20 7" stroke={SK} strokeWidth="5.5" strokeLinecap="round" fill="none"/>
+  </g>;
+}
 
 function Hand({ k, flip = false }: { k: HandKey; flip?: boolean }) {
   const inner = (() => {
@@ -365,6 +452,9 @@ function Hand({ k, flip = false }: { k: HandKey; flip?: boolean }) {
       case "L":        return <HandL/>;
       case "A":        return <HandA/>;
       case "O":        return <HandO/>;
+      case "I_LET":    return <HandILetter/>;
+      case "R_LET":    return <HandRLetter/>;
+      default:         return <HandFLAT/>;
     }
   })();
   return <g transform={flip ? "scale(-1,1)" : undefined}>{inner}</g>;
@@ -410,9 +500,10 @@ interface Signer2DProps {
   word?: string;
   tag?: string;
   className?: string;
+  showHint?: boolean;
 }
 
-export function Signer2D({ word = "", tag = "", className = "" }: Signer2DProps) {
+export function Signer2D({ word = "", tag = "", className = "", showHint = true }: Signer2DProps) {
   const [cfg, setCfg] = useState<SignConfig>({
     right: REST_R, rHand: "FLAT", expression: "NEUTRAL", hint: "",
   });
@@ -446,6 +537,11 @@ export function Signer2D({ word = "", tag = "", className = "" }: Signer2DProps)
         @keyframes s-flick  { 0%,70%{transform:translateY(0)} 85%{transform:translateY(-11px)} 100%{transform:translateY(0)} }
         @keyframes s-tap    { 0%,100%{transform:translateY(0)} 40%{transform:translateY(7px)} }
         @keyframes s-wiggle { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(14deg)} 75%{transform:rotate(-14deg)} }
+        @keyframes s-you    { 0%,100%{transform:translate(0,0)} 40%{transform:translate(16px,-8px)} 70%{transform:translate(12px,-4px)} }
+        @keyframes s-to-self{ 0%,100%{transform:translate(0,0)} 50%{transform:translate(-12px,10px)} }
+        @keyframes s-g-slide{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(12px)} }
+        @keyframes s-j-hook { 0%,100%{transform:translate(0,0)} 50%{transform:translate(0,14px)} }
+        @keyframes s-z-draw { 0%{transform:translate(-10px,-8px)} 35%{transform:translate(10px,-8px)} 70%{transform:translate(-10px,8px)} 100%{transform:translate(10px,8px)} }
         .motion-wave   { animation: s-wave   0.9s ease-in-out infinite; transform-origin: 270px 90px; }
         .motion-circle { animation: s-circle 1.4s linear     infinite; }
         .motion-push   { animation: s-push   1.1s ease-in-out infinite; }
@@ -458,6 +554,12 @@ export function Signer2D({ word = "", tag = "", className = "" }: Signer2DProps)
         .motion-wiggle { animation: s-wiggle 0.8s ease-in-out infinite; }
         .motion-roll   { animation: s-circle 1.0s linear     infinite; }
         .motion-flip   { animation: s-wave   0.8s ease-in-out 2; }
+        .motion-you    { animation: s-you    0.75s ease-in-out 2; transform-origin: 270px 90px; }
+        .motion-to-self{ animation: s-to-self 0.65s ease-in-out 2; transform-origin: 238px 100px; }
+        .motion-hold   { animation: none; }
+        .motion-g-slide{ animation: s-g-slide 0.8s ease-in-out 2; }
+        .motion-j-hook { animation: s-j-hook 0.9s ease-in-out 2; }
+        .motion-z-draw { animation: s-z-draw 1.1s ease-in-out 1; }
       `}</style>
 
       {/* ── SVG canvas ── */}
@@ -503,9 +605,9 @@ export function Signer2D({ word = "", tag = "", className = "" }: Signer2DProps)
         )}
       </svg>
 
-      {/* Hint */}
-      {cfg.hint && (
-        <p className="text-[11px] text-slate-400 italic text-center leading-snug px-2">
+      {/* Hint — only during teaching, never on quizzes */}
+      {showHint && cfg.hint && (
+        <p className="text-[11px] text-[var(--text-muted)] italic text-center leading-snug px-2">
           {cfg.hint}
         </p>
       )}

@@ -28,7 +28,8 @@ VIEWBOX_W = 360.0
 VIEWBOX_H = 240.0
 
 HAND_SHAPES = ['NONE','FLAT','FIST','POINT','V','C','OK',
-               'THUMB_UP','ILY','CLAW','HORNS','L','A','O']
+               'THUMB_UP','ILY','CLAW','HORNS','L','A','O',
+               'W','BENT_V','PINCH_MID','X','H','OPEN_5','Y','PINKY','R']
 
 EXPRESSIONS = ['NEUTRAL','HAPPY','QUESTION','WH_QUESTION','NEGATIVE','EMPHATIC']
 
@@ -167,6 +168,37 @@ def load_wlasl_dataset(
 def wlasl_features_available(features_dir: Path | None = None) -> bool:
     """Return True if pre-extracted WLASL features exist on disk."""
     d = Path(features_dir) if features_dir else _WLASL_FEATURES_DIR
+    return (d / 'X.npy').exists()
+
+
+_TSL_FEATURES_DIR = Path(__file__).parent / 'tsl_features'
+
+
+def load_tsl_dataset(
+    features_dir: Path | None = None,
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Load pre-extracted Tunisian Sign Language features."""
+    d = Path(features_dir) if features_dir else _TSL_FEATURES_DIR
+    x_path = d / 'X.npy'
+    y_path = d / 'y.npy'
+    c_path = d / 'classes.json'
+
+    if not x_path.exists():
+        raise FileNotFoundError(
+            f"TSL features not found at {x_path}. "
+            "Run: python -m backend.ml.extract_features_from_images"
+        )
+
+    X = np.load(str(x_path))
+    y = np.load(str(y_path))
+    with open(c_path, 'r', encoding='utf-8') as f:
+        classes = json.load(f)
+
+    return X.astype(np.float32), y.astype(np.int32), classes
+
+
+def tsl_features_available(features_dir: Path | None = None) -> bool:
+    d = Path(features_dir) if features_dir else _TSL_FEATURES_DIR
     return (d / 'X.npy').exists()
 
 

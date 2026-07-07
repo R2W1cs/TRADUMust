@@ -105,11 +105,11 @@
       let captionText = '';
 
       for (const selector of selectors) {
-        const elements = document.querySelectorAll(selector);
+        // Try normal DOM first, then pierce shadow DOM
+        const elements = this._queryAll(document, selector);
         if (elements.length === 0) continue;
 
-        // Collect all caption text from matched elements
-        const text = Array.from(elements)
+        const text = elements
           .map(el => el.textContent || el.innerText || '')
           .join(' ')
           .replace(/\s+/g, ' ')
@@ -118,7 +118,6 @@
         if (text.length > 2) {
           captionText = text;
           if (this._strategy === 'none') {
-            // First caption found — lock strategy to DOM
             this._strategy = 'dom';
             console.log(`[SignBridge] DOM captions found via "${selector}"`);
           }
@@ -129,10 +128,31 @@
       if (captionText && captionText !== this._lastText) {
         this._emitText(captionText, true);
       } else if (!captionText && this._strategy === 'none') {
-        // Debug: log which selectors were tried so the Teams DOM can be inspected
-        const tried = selectors.map(s => `"${s}" → ${document.querySelectorAll(s).length}`).join(', ');
-        console.debug('[SignBridge] Polling Teams DOM — no captions yet. Tried:', tried);
+        const tried = selectors.map(s => `"${s}"(${this._queryAll(document, s).length})`).join(', ');
+        console.debug('[SignBridge] No captions yet. Tried:', tried);
       }
+    },
+
+    /**
+     * querySelector that pierces shadow DOM roots recursively.
+     * Needed for Teams (Fluent UI) and Zoom which use shadow DOM components.
+     */
+    _queryAll(root, selector) {
+      const results = [];
+      try {
+        results.push(...Array.from(root.querySelectorAll(selector)));
+      } catch (_) {}
+
+      // Walk all shadow roots
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      let node = walker.nextNode();
+      while (node) {
+        if (node.shadowRoot) {
+          results.push(...this._queryAll(node.shadowRoot, selector));
+        }
+        node = walker.nextNode();
+      }
+      return results;
     },
 
     // ── Strategy B: Web Speech API ───────────────────────────────────────────

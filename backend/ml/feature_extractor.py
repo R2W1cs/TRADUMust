@@ -29,13 +29,22 @@ import numpy as np
 # Number of hand landmarks (MediaPipe hand model)
 N_HAND_LANDMARKS = 21
 N_FACE_LANDMARKS = 20  # Selected landmarks for mouth and eyebrows
+N_POSE_LANDMARKS = 15  # Upper body: shoulders, elbows, wrists, hips (indices below)
 N_HAND_FEATURES  = N_HAND_LANDMARKS * 3   # x, y, z per landmark = 63
 N_FACE_FEATURES  = N_FACE_LANDMARKS * 3   # 60
-N_FEATURES       = (N_HAND_FEATURES * 2) + N_FACE_FEATURES # 126 + 60 = 186
+N_POSE_FEATURES  = N_POSE_LANDMARKS * 3   # 45  — always visible, high signal
+N_FEATURES       = (N_HAND_FEATURES * 2) + N_FACE_FEATURES + N_POSE_FEATURES  # 231
 
-# MediaPipe pose landmark indices
+# MediaPipe pose landmark indices used for normalization
 _POSE_LEFT_SHOULDER  = 11
 _POSE_RIGHT_SHOULDER = 12
+
+# Upper-body pose landmark indices included as features
+# 11=L_shoulder, 12=R_shoulder, 13=L_elbow, 14=R_elbow,
+# 15=L_wrist, 16=R_wrist, 17=L_pinky, 18=R_pinky,
+# 19=L_index, 20=R_index, 23=L_hip, 24=R_hip,
+# 0=nose, 7=L_ear, 8=R_ear
+POSE_FEATURE_INDICES = [0, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 24]
 
 # MediaPipe face landmark indices (approximate indices for mouth and eyebrows)
 # Reference: https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
@@ -46,6 +55,18 @@ FACE_LANDMARK_INDICES = [
     70, 63, 105, 66, 107,  # Left
     336, 296, 334, 293, 300 # Right
 ]
+
+def _pose_to_array(landmarks: list[dict] | None) -> np.ndarray:
+    """Extract upper-body pose landmarks as a flat (45,) float32 array."""
+    if not landmarks or len(landmarks) <= max(POSE_FEATURE_INDICES):
+        return np.zeros(N_POSE_FEATURES, dtype=np.float32)
+    arr = np.array(
+        [[landmarks[i].get('x', 0.0), landmarks[i].get('y', 0.0), landmarks[i].get('z', 0.0)]
+         for i in POSE_FEATURE_INDICES],
+        dtype=np.float32,
+    ).flatten()
+    return arr
+
 
 def _hand_to_array(landmarks: list[dict] | None) -> np.ndarray:
     """
@@ -116,31 +137,34 @@ def extract_holistic_features(
     face:       list[dict] | None = None,
 ) -> np.ndarray:
     """
-    Convert MediaPipe Holistic output to a normalized 186-feature vector.
+    Convert MediaPipe Holistic output to a normalized 231-feature vector.
 
     Parameters
     ----------
     right_hand : list of 21 dicts {x, y, z} or None
     left_hand  : list of 21 dicts {x, y, z} or None
-    pose       : list of 33 dicts {x, y, z} or None (used for normalization)
+    pose       : list of 33 dicts {x, y, z} or None
     face       : list of 468+ dicts {x, y, z} or None
 
     Returns
     -------
-    np.ndarray shape (186,), dtype float32
+    np.ndarray shape (231,), dtype float32
         [0:63]    right-hand landmarks, normalized
         [63:126]  left-hand landmarks, normalized
         [126:186] face landmarks (mouth/eyebrows), normalized
+        [186:231] upper-body pose landmarks, normalized  ← always non-zero
     """
-    rh_present = bool(right_hand and len(right_hand) >= N_HAND_LANDMARKS)
-    lh_present = bool(left_hand  and len(left_hand)  >= N_HAND_LANDMARKS)
+    rh_present   = bool(right_hand and len(right_hand) >= N_HAND_LANDMARKS)
+    lh_present   = bool(left_hand  and len(left_hand)  >= N_HAND_LANDMARKS)
     face_present = bool(face and len(face) >= 468)
+    pose_present = bool(pose and len(pose) > max(POSE_FEATURE_INDICES))
 
     rh = _hand_to_array(right_hand)
     lh = _hand_to_array(left_hand)
     fa = _face_to_array(face)
+    po = _pose_to_array(pose)
 
-    # Apply pose normalization
+    # Apply pose normalization (center on shoulder midpoint, scale by shoulder width)
     params = _pose_params(pose) if pose else None
     if params is not None:
         mid, width = params
@@ -150,14 +174,17 @@ def extract_holistic_features(
             lh = _normalize_points(lh, mid, width)
         if face_present:
             fa = _normalize_points(fa, mid, width)
+        if pose_present:
+            po = _normalize_points(po, mid, width)
 
-    return np.concatenate([rh, lh, fa]).astype(np.float32)
+    return np.concatenate([rh, lh, fa, po]).astype(np.float32)
 
 
 def pool_frame_sequence(frames: list[np.ndarray]) -> np.ndarray:
     """
     Temporal aggregation: reduce a variable-length sequence of per-frame
     feature vectors to a fixed-length (N_FEATURES * 2) representation.
+    Mean + std encodes both the average pose and the motion variance.
     """
     if not frames:
         return np.zeros(N_FEATURES * 2, dtype=np.float32)

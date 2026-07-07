@@ -27,17 +27,20 @@
       MEET:     'google-meet',
       ZOOM:     'zoom',
       TEAMS:    'microsoft-teams',
+      COURSERA: 'coursera',
       UNKNOWN:  'unknown',
     },
 
     detect() {
       const h = location.hostname;
-      if (h.includes('youtube.com'))          return this.PLATFORMS.YOUTUBE;
-      if (h.includes('meet.google.com'))      return this.PLATFORMS.MEET;
-      if (h.includes('zoom.us'))              return this.PLATFORMS.ZOOM;
-      if (h.includes('teams.microsoft.com'))  return this.PLATFORMS.TEAMS;
-      if (h.includes('teams.live.com'))       return this.PLATFORMS.TEAMS;
+      if (h.includes('youtube.com'))           return this.PLATFORMS.YOUTUBE;
+      if (h.includes('meet.google.com'))       return this.PLATFORMS.MEET;
+      if (h.includes('zoom.us'))               return this.PLATFORMS.ZOOM;
+      if (h.includes('teams.microsoft.com'))   return this.PLATFORMS.TEAMS;
+      if (h.includes('teams.live.com'))        return this.PLATFORMS.TEAMS;
       if (h.includes('teams.cloud.microsoft')) return this.PLATFORMS.TEAMS;
+      if (h.includes('microsoftstream.com'))   return this.PLATFORMS.TEAMS;
+      if (h.includes('coursera.org'))          return this.PLATFORMS.COURSERA;
       return this.PLATFORMS.UNKNOWN;
     },
 
@@ -47,6 +50,7 @@
         'google-meet':       'Google Meet',
         'zoom':              'Zoom',
         'microsoft-teams':   'Microsoft Teams',
+        'coursera':          'Coursera',
         'unknown':           'Unknown Platform',
       }[this.detect()] || 'Unknown';
     },
@@ -87,11 +91,34 @@
           '[class*="caption"] span',
         ],
         'zoom': [
-          // Zoom web client live transcript
+          // Zoom web client (app.zoom.us/wc/meeting/...) live captions
+          // Enable via: CC button in toolbar → "Show captions"
+          '.zoom-sdk-caption-view',
+          '[class*="CaptionView"]',
+          '[class*="caption-host"]',
           '.captions-text',
           '.subtitle-text',
+          // Zoom live transcript panel
+          '[class*="live-transcription"]',
+          '[class*="transcript-text"]',
           '[class*="caption-item"]',
-          '[aria-label*="caption"]',
+          // Aria-based fallbacks (most stable across Zoom updates)
+          '[aria-label*="caption" i]',
+          '[aria-live="polite"][class*="caption"]',
+          '[role="log"][class*="caption"]',
+        ],
+        'coursera': [
+          // Coursera video player subtitles
+          '.cml-viewer',
+          '[class*="subtitle"] span',
+          '[class*="caption"] span',
+          // Coursera lecture transcript (right panel)
+          '[class*="TranscriptItem"] span',
+          '[class*="transcript-phrase"]',
+          '[data-testid*="transcript"] span',
+          // Video.js player (Coursera uses it)
+          '.vjs-text-track-cue span',
+          '.vjs-text-track-display span',
         ],
         'microsoft-teams': [
           // ── New Teams (Fluent UI v9, 2024+) ──────────────────────────────
@@ -141,6 +168,12 @@
           // Generic fallback
           'video',
         ],
+        'coursera':        [
+          'video.vjs-tech',
+          '[class*="VideoPlayer"] video',
+          '.c-video-asset video',
+          'video',
+        ],
         'unknown':         ['video'],
       }[this.detect()] || ['video'];
     },
@@ -148,10 +181,10 @@
     /**
      * Whether this platform reliably provides DOM-accessible captions.
      * If false, AudioProcessor will fall through to Web Speech API.
+     * All platforms try DOM first; speech is the fallback if no captions found.
      */
     hasDomCaptions() {
-      return this.detect() !== this.PLATFORMS.UNKNOWN &&
-             this.detect() !== this.PLATFORMS.ZOOM; // Zoom uses iframe/shadow DOM
+      return this.detect() !== this.PLATFORMS.UNKNOWN;
     },
 
     /**
@@ -164,6 +197,7 @@
         'google-meet': 'Click the three-dot menu → "Turn on captions".',
         'zoom': 'Click "CC" in the meeting controls toolbar.',
         'microsoft-teams': 'Click "More" (···) → "Language and speech" → "Turn on live captions".',
+        'coursera': 'Click the CC button in the video player, or open the "Transcript" panel on the right.',
         'unknown': 'Enable captions on your platform if available, or allow microphone access.',
       }[this.detect()] || '';
     },

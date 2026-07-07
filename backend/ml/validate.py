@@ -115,6 +115,7 @@ def evaluate(
 
     report = classification_report(
         y_test, y_pred,
+        labels=list(range(len(classes))),
         target_names=classes,
         output_dict=True,
         zero_division=0,
@@ -225,16 +226,21 @@ def evaluate_clusters(
 
     overall_purity = purity_sum / len(y)
 
-    # Category alignment: check if clusters match hand-crafted categories
-    categories = [signs_data[classes[i]]['category'] for i in range(len(classes))]
-    cat_array  = np.array(categories)
-    unique_cats = sorted(set(categories))
-    cat_enc     = {c: i for i, c in enumerate(unique_cats)}
-    y_cat       = np.array([cat_enc[c] for c in cat_array])
-    # Map sample labels to category labels
-    y_cat_samples = y_cat[y]
-    cat_ari = float(adjusted_rand_score(y_cat_samples, cluster_labels))
-    cat_nmi = float(normalized_mutual_info_score(y_cat_samples, cluster_labels))
+    # Category alignment: only available when synthetic signs_data is provided
+    cat_ari = cat_nmi = None
+    has_categories = (
+        signs_data
+        and all(classes[i] in signs_data and 'category' in signs_data[classes[i]]
+                for i in range(len(classes)))
+    )
+    if has_categories:
+        categories    = [signs_data[classes[i]]['category'] for i in range(len(classes))]
+        unique_cats   = sorted(set(categories))
+        cat_enc       = {c: i for i, c in enumerate(unique_cats)}
+        y_cat         = np.array([cat_enc[c] for c in categories])
+        y_cat_samples = y_cat[y]
+        cat_ari = float(adjusted_rand_score(y_cat_samples, cluster_labels))
+        cat_nmi = float(normalized_mutual_info_score(y_cat_samples, cluster_labels))
 
     return {
         'ari':              ari,

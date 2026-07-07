@@ -1,40 +1,61 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { usersApi } from "@/lib/tradumust-api";
 
-export type ThemeType = "default" | "japan" | "france" | "mexico";
 export type ModeType = "light" | "dark";
 
 interface ThemeContextType {
-  theme: ThemeType;
-  setTheme: (theme: ThemeType) => void;
   mode: ModeType;
   toggleMode: () => void;
+  setMode: (mode: ModeType) => void;
+  applyMode: (mode: ModeType, persist?: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<ThemeType>("default");
-  const [mode, setMode] = useState<ModeType>("light");
+  const [mode, setModeState] = useState<ModeType>("light");
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("theme-japan", "theme-france", "theme-mexico", "dark-mode");
+    if (mode === "dark") root.classList.add("dark-mode");
+  }, [mode]);
 
-    if (theme !== "default") {
-      root.classList.add(`theme-${theme}`);
+  const persistTheme = useCallback(async (next: ModeType) => {
+    const token = localStorage.getItem("tradumust_token");
+    if (!token) return;
+    try {
+      await usersApi.updateProfile({ theme: next });
+    } catch {
+      /* offline */
     }
+  }, []);
 
-    if (mode === "dark") {
-      root.classList.add("dark-mode");
-    }
-  }, [theme, mode]);
+  const applyMode = useCallback(
+    (next: ModeType, persist = true) => {
+      setModeState(next);
+      if (persist) persistTheme(next);
+    },
+    [persistTheme]
+  );
 
-  const toggleMode = () => setMode(prev => prev === "light" ? "dark" : "light");
+  const setMode = useCallback(
+    (next: ModeType) => applyMode(next, true),
+    [applyMode]
+  );
+
+  const toggleMode = useCallback(() => {
+    setModeState((prev) => {
+      const next = prev === "light" ? "dark" : "light";
+      persistTheme(next);
+      return next;
+    });
+  }, [persistTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, mode, toggleMode }}>
+    <ThemeContext.Provider value={{ mode, toggleMode, setMode, applyMode }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -47,3 +68,4 @@ export function useTheme() {
   }
   return context;
 }
+

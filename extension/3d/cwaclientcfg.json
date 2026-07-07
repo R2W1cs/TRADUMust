@@ -1,0 +1,17 @@
+{
+  "description": "TRADUMUST extension CWASA embed",
+  "animgenServer": null,
+  "avs": ["anna", "marc", "francoise"],
+  "avSettings": [
+    {
+      "width": 384,
+      "height": 320,
+      "avList": "avs",
+      "initAv": "anna",
+      "allowFrameSteps": false,
+      "allowSiGMLText": false,
+      "initSiGMLURL": null,
+      "background": null
+    }
+  ]
+}

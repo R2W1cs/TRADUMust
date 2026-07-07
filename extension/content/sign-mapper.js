@@ -310,14 +310,15 @@
     STUDY: {
       right: { elbow: { x: 255, y: 108 }, wrist: { x: 235, y: 95 } },
       left:  { elbow: { x: 108, y: 115 }, wrist: { x: 125, y: 108 } },
-      rHand: 'POINT', lHand: 'FLAT', expression: 'NEUTRAL', rMotion: 'motion-wiggle',
+      rHand: 'CLAW', lHand: 'FLAT', expression: 'NEUTRAL', rMotion: 'motion-wiggle',
       category: 'academic',
       description: 'Wiggling fingers point toward non-dominant palm',
       culturalNote: 'STUDY shows mental activity directed at material — the wiggling fingers represent the brain working. Deaf students often study in Deaf study groups where ASL is the language of instruction.',
     },
     HOMEWORK: {
       right: { elbow: { x: 248, y: 105 }, wrist: { x: 228, y: 92 } },
-      rHand: 'FLAT', expression: 'NEUTRAL', rMotion: 'motion-tap',
+      left:  { elbow: { x: 112, y: 112 }, wrist: { x: 132, y: 102 } },
+      rHand: 'FIST', lHand: 'FIST', expression: 'NEUTRAL', rMotion: 'motion-tap',
       category: 'academic',
       description: 'HOME + WORK: cheek tap, then alternating fists',
       culturalNote: 'ASL often creates compound signs by combining two existing signs, much like compound words in English. HOMEWORK = HOME + WORK.',
@@ -325,7 +326,7 @@
     TEST: {
       right: { elbow: { x: 255, y: 108 }, wrist: { x: 232, y: 92 } },
       left:  { elbow: { x: 105, y: 108 }, wrist: { x: 128, y: 92 } },
-      rHand: 'POINT', lHand: 'POINT', expression: 'NEUTRAL',
+      rHand: 'X', lHand: 'X', expression: 'NEUTRAL',
       rMotion: 'motion-push', lMotion: 'motion-push',
       category: 'academic',
       description: 'Both index fingers curve downward like question marks',
@@ -334,7 +335,7 @@
     EXAM: {
       right: { elbow: { x: 255, y: 108 }, wrist: { x: 232, y: 92 } },
       left:  { elbow: { x: 105, y: 108 }, wrist: { x: 128, y: 92 } },
-      rHand: 'POINT', lHand: 'POINT', expression: 'NEUTRAL',
+      rHand: 'X', lHand: 'X', expression: 'NEUTRAL',
       rMotion: 'motion-push', lMotion: 'motion-push',
       category: 'academic',
       description: 'Similar to TEST — bent index fingers move down',
@@ -490,7 +491,7 @@
     },
     SEE: {
       right: { elbow: { x: 250, y: 102 }, wrist: { x: 230, y: 86 } },
-      rHand: 'V', expression: 'NEUTRAL',
+      rHand: 'BENT_V', expression: 'NEUTRAL',
       category: 'verbs',
       description: 'V-shape at the eyes moves forward',
       culturalNote: 'SEE uses the V-handshape from the eyes — depicting sight lines extending outward. Vision is paramount in Deaf culture; maintaining eye contact is respectful and communicative.',
@@ -527,7 +528,7 @@
     },
     LIKE: {
       right: { elbow: { x: 248, y: 115 }, wrist: { x: 225, y: 105 } },
-      rHand: 'FLAT', expression: 'HAPPY', rMotion: 'motion-push',
+      rHand: 'PINCH_MID', expression: 'HAPPY', rMotion: 'motion-push',
       category: 'verbs',
       description: 'Middle finger and thumb pinch at chest, pull forward',
       culturalNote: 'LIKE (enjoy) uses a gesture of pulling something pleasant from the heart. LOVE uses a stronger, more emphatic gesture to show deeper feeling.',
@@ -568,7 +569,7 @@
     FINISH: {
       right: { elbow: { x: 258, y: 108 }, wrist: { x: 244, y: 92 } },
       left:  { elbow: { x: 102, y: 108 }, wrist: { x: 116, y: 92 } },
-      rHand: 'FLAT', lHand: 'FLAT', expression: 'NEUTRAL',
+      rHand: 'OPEN_5', lHand: 'OPEN_5', expression: 'NEUTRAL',
       rMotion: 'motion-flip', lMotion: 'motion-flip',
       category: 'verbs',
       description: 'Both flat hands flip outward (completion)',
@@ -611,7 +612,7 @@
     EXCITED: {
       right: { elbow: { x: 242, y: 112 }, wrist: { x: 220, y: 125 } },
       left:  { elbow: { x: 118, y: 112 }, wrist: { x: 140, y: 125 } },
-      rHand: 'FLAT', lHand: 'FLAT', expression: 'HAPPY',
+      rHand: 'PINCH_MID', lHand: 'PINCH_MID', expression: 'HAPPY',
       rMotion: 'motion-circle', lMotion: 'motion-circle',
       category: 'emotions',
       description: 'Alternating hands circle upward at chest (rising excitement)',
@@ -646,7 +647,7 @@
     NAME: {
       right: { elbow: { x: 258, y: 92 }, wrist: { x: 244, y: 78 } },
       left:  { elbow: { x: 102, y: 92 }, wrist: { x: 116, y: 78 } },
-      rHand: 'V', lHand: 'V', expression: 'NEUTRAL', rMotion: 'motion-tap',
+      rHand: 'H', lHand: 'H', expression: 'NEUTRAL', rMotion: 'motion-tap',
       category: 'pronouns',
       description: 'H-hands tap together twice',
       culturalNote: 'NAME (MY-NAME-IS) is often one of the first signs people learn. In Deaf culture, everyone gets a "name sign" — a unique personal sign given by the Deaf community, not self-assigned.',
@@ -703,9 +704,9 @@
     },
     PHONE: {
       right: { elbow: { x: 255, y: 90 }, wrist: { x: 235, y: 75 } },
-      rHand: 'ILY', expression: 'NEUTRAL', rMotion: 'motion-tap',
+      rHand: 'Y', expression: 'NEUTRAL', rMotion: 'motion-tap',
       category: 'technology',
-      description: 'Y-handshape (ILY) at the ear (old handset shape)',
+      description: 'Y-handshape at the ear (old handset shape)',
       culturalNote: 'The phone sign mimics an old telephone handset. Modern TTY devices and video relay have transformed how Deaf people use phones. The first TTY was invented in 1964 by a Deaf scientist.',
     },
     CAPTION: {
@@ -788,8 +789,8 @@
 
     ONE:   { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'POINT', expression: 'NEUTRAL', category: 'numbers', description: 'Index finger raised', culturalNote: 'ASL number signs are one-handed and are partly transparent (1-5 look like counting on fingers). Numbers are signed palm-facing out.' },
     TWO:   { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'V', expression: 'NEUTRAL', category: 'numbers', description: 'Index and middle raised (V-shape)', culturalNote: 'TWO uses the same V-handshape as SEE and VICTORY/PEACE — context distinguishes them. Numbers in ASL can be incorporated into other signs for efficiency.' },
-    THREE: { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'V', expression: 'NEUTRAL', category: 'numbers', description: 'Index, middle, ring fingers raised', culturalNote: 'THREE raises three fingers. Number incorporation means you can sign "3 days," "3 weeks" by combining the number with the time sign directly.' },
-    FIVE:  { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'FLAT', expression: 'NEUTRAL', category: 'numbers', description: 'All five fingers spread open', culturalNote: 'FIVE is an open hand — the most natural counting position. In Deaf children, number signs often emerge early as some of the first signed vocabulary.' },
+    THREE: { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'W', expression: 'NEUTRAL', category: 'numbers', description: 'Index, middle, ring fingers raised', culturalNote: 'THREE raises three fingers. Number incorporation means you can sign "3 days," "3 weeks" by combining the number with the time sign directly.' },
+    FIVE:  { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'OPEN_5', expression: 'NEUTRAL', category: 'numbers', description: 'All five fingers spread wide open', culturalNote: 'FIVE is an open hand — the most natural counting position. In Deaf children, number signs often emerge early as some of the first signed vocabulary.' },
     TEN:   { right: { elbow: { x: 265, y: 105 }, wrist: { x: 265, y: 75 } }, rHand: 'THUMB_UP', expression: 'NEUTRAL', rMotion: 'motion-shake', category: 'numbers', description: 'Thumb-up shakes (10)', culturalNote: 'TEN shakes a thumb-up handshape. For numbers 11-19, ASL uses unique handshapes. Numbers in ASL are an entire subsystem with specific handshapes for each value.' },
 
     // ──────────────────────────────── Fallback tags ──────────────────────────
@@ -856,7 +857,7 @@
     },
     CALL: {
       right: { elbow: { x: 255, y: 88 }, wrist: { x: 228, y: 68 } },
-      rHand: 'ILY', expression: 'NEUTRAL', rMotion: 'motion-tap',
+      rHand: 'Y', expression: 'NEUTRAL', rMotion: 'motion-tap',
       category: 'communication', description: 'ILY hand held near ear like a phone handset',
       culturalNote: 'CALL (phone) mimics holding a handset. In Deaf culture, video relay services (VRS) and video calling are often called "video phone" — a significant technology.',
     },
@@ -985,7 +986,7 @@
     PLAY: {
       right: { elbow: { x: 275, y: 118 }, wrist: { x: 296, y: 105 } },
       left:  { elbow: { x: 105, y: 118 }, wrist: { x:  84, y: 105 } },
-      rHand: 'ILY', lHand: 'ILY', expression: 'HAPPY', rMotion: 'motion-shake',
+      rHand: 'Y', lHand: 'Y', expression: 'HAPPY', rMotion: 'motion-shake',
       category: 'actions', description: 'Both Y-hands shake loosely (play/recreation)',
       culturalNote: 'PLAY uses the Y-handshape (thumb and pinky extended), shaken loosely. Games, sports, and music each have their own specific signs too.',
     },
@@ -1652,11 +1653,11 @@
   // Uses simplified arm position (hand held at face height, right side).
   const FACE_POS = { elbow: { x: 258, y: 88 }, wrist: { x: 244, y: 68 } };
   const FINGERSPELL_HANDS = {
-    A:'A', B:'FLAT', C:'C', D:'POINT', E:'CLAW', F:'OK',
-    G:'L', H:'V', I:'ILY', J:'ILY', K:'V', L:'L',
-    M:'FIST', N:'FIST', O:'O', P:'L', Q:'L', R:'V',
-    S:'A', T:'FIST', U:'V', V:'V', W:'V', X:'POINT',
-    Y:'ILY', Z:'POINT',
+    A:'A',     B:'FLAT',  C:'C',     D:'POINT', E:'CLAW',  F:'OK',
+    G:'L',     H:'H',     I:'PINKY', J:'PINKY', K:'V',     L:'L',
+    M:'FIST',  N:'FIST',  O:'O',     P:'L',     Q:'L',     R:'R',
+    S:'A',     T:'FIST',  U:'H',     V:'V',     W:'W',     X:'X',
+    Y:'Y',     Z:'POINT',
   };
 
   // ─── Synonym / phrase → sign key mapping ─────────────────────────────────

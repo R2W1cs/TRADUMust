@@ -1,0 +1,1521 @@
+{
+  "data_source": "tsl",
+  "model_type": "sklearn",
+  "device": "cuda",
+  "dataset": {
+    "total_samples": 3662,
+    "n_classes": 57,
+    "n_features": 462,
+    "train_size": 2636,
+    "val_size": 293,
+    "test_size": 733
+  },
+  "sklearn": {
+    "KNN": {
+      "cross_validation": {
+        "accuracy": {
+          "test_mean": 0.8555806423383215,
+          "test_std": 0.013083998229366983,
+          "train_mean": 1.0,
+          "train_std": 0.0,
+          "overfit_gap": 0.14441935766167846
+        },
+        "precision": {
+          "test_mean": 0.8681312459243784,
+          "test_std": 0.014260531099357866,
+          "train_mean": 1.0,
+          "train_std": 0.0,
+          "overfit_gap": 0.1318687540756216
+        },
+        "recall": {
+          "test_mean": 0.8555806423383215,
+          "test_std": 0.013083998229366983,
+          "train_mean": 1.0,
+          "train_std": 0.0,
+          "overfit_gap": 0.14441935766167846
+        },
+        "f1": {
+          "test_mean": 0.8509149447495286,
+          "test_std": 0.014995335663570815,
+          "train_mean": 1.0,
+          "train_std": 0.0,
+          "overfit_gap": 0.14908505525047144
+        }
+      },
+      "test_evaluation": {
+        "accuracy": 0.8867667121418826,
+        "top_k_accuracy": 0.9672578444747613,
+        "k": 3,
+        "per_class": {
+          "3ASLEMA": {
+            "precision": 0.8888888888888888,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.8888888888888888,
+            "support": 9.0
+          },
+          "MAR7BA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+          },
+          "LABES": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 4.0
+          },
+          "NEKTEBLK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 11.0
+          },
+          "OUI": {
+            "precision": 0.75,
+            "recall": 1.0,
+            "f1-score": 0.8571428571428571,
+            "support": 18.0
+          },
+          "NON": {
+            "precision": 0.9166666666666666,
+            "recall": 0.7857142857142857,
+            "f1-score": 0.8461538461538461,
+            "support": 14.0
+          },
+          "ENTI": {
+            "precision": 0.6428571428571429,
+            "recall": 0.8181818181818182,
+            "f1-score": 0.72,
+            "support": 11.0
+          },
+          "ASSAM": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+          },
+          "T7EB": {
+            "precision": 0.6,
+            "recall": 0.375,
+            "f1-score": 0.46153846153846156,
+            "support": 8.0
+          },
+          "TA3RAF": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+          },
+          "TA9RA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 8.0
+          },
+          "N3AWNEK": {
+            "precision": 0.9444444444444444,
+            "recall": 1.0,
+            "f1-score": 0.9714285714285714,
+            "support": 17.0
+          },
+          "LYOUM": {
+            "precision": 1.0,
+            "recall": 0.8,
+            "f1-score": 0.8888888888888888,
+            "support": 10.0
+          },
+          "DEMANDE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "5ADAMET": {
+            "precision": 0.6666666666666666,
+            "recall": 1.0,
+            "f1-score": 0.8,
+            "support": 4.0
+          },
+          "TA3LIM": {
+            "precision": 0.9375,
+            "recall": 1.0,
+            "f1-score": 0.967741935483871,
+            "support": 15.0
+          },
+          "RADIO": {
+            "precision": 0.9583333333333334,
+            "recall": 1.0,
+            "f1-score": 0.9787234042553191,
+            "support": 23.0
+          },
+          "TELVZA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "THA9AFA": {
+            "precision": 1.0,
+            "recall": 0.9166666666666666,
+            "f1-score": 0.9565217391304348,
+            "support": 12.0
+          },
+          "CHABEB": {
+            "precision": 0.7692307692307693,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.8333333333333334,
+            "support": 11.0
+          },
+          "SE7A": {
+            "precision": 0.9230769230769231,
+            "recall": 0.7058823529411765,
+            "f1-score": 0.8,
+            "support": 17.0
+          },
+          "SIYE7A": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 10.0
+          },
+          "BARNAMJK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 18.0
+          },
+          "CV": {
+            "precision": 0.7692307692307693,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.8333333333333334,
+            "support": 11.0
+          },
+          "OM": {
+            "precision": 0.7777777777777778,
+            "recall": 0.7777777777777778,
+            "f1-score": 0.7777777777777778,
+            "support": 9.0
+          },
+          "BOU": {
+            "precision": 0.9642857142857143,
+            "recall": 1.0,
+            "f1-score": 0.9818181818181818,
+            "support": 27.0
+          },
+          "BENT": {
+            "precision": 0.7647058823529411,
+            "recall": 0.7878787878787878,
+            "f1-score": 0.7761194029850746,
+            "support": 33.0
+          },
+          "EBEN": {
+            "precision": 0.7714285714285715,
+            "recall": 0.9310344827586207,
+            "f1-score": 0.84375,
+            "support": 29.0
+          },
+          "O5T": {
+            "precision": 0.9565217391304348,
+            "recall": 0.8461538461538461,
+            "f1-score": 0.8979591836734694,
+            "support": 26.0
+          },
+          "5OU": {
+            "precision": 0.9473684210526315,
+            "recall": 0.972972972972973,
+            "f1-score": 0.96,
+            "support": 37.0
+          },
+          "MAR2A": {
+            "precision": 0.9090909090909091,
+            "recall": 0.9523809523809523,
+            "f1-score": 0.9302325581395349,
+            "support": 21.0
+          },
+          "TFOL": {
+            "precision": 0.8181818181818182,
+            "recall": 0.75,
+            "f1-score": 0.782608695652174,
+            "support": 12.0
+          },
+          "3AYLA": {
+            "precision": 0.9166666666666666,
+            "recall": 1.0,
+            "f1-score": 0.9565217391304348,
+            "support": 11.0
+          },
+          "JAD": {
+            "precision": 1.0,
+            "recall": 0.8421052631578947,
+            "f1-score": 0.9142857142857143,
+            "support": 19.0
+          },
+          "JADDA": {
+            "precision": 0.7647058823529411,
+            "recall": 0.9285714285714286,
+            "f1-score": 0.8387096774193549,
+            "support": 14.0
+          },
+          "5AL_3AM": {
+            "precision": 0.9705882352941176,
+            "recall": 0.868421052631579,
+            "f1-score": 0.9166666666666666,
+            "support": 38.0
+          },
+          "DAR": {
+            "precision": 0.4375,
+            "recall": 0.5384615384615384,
+            "f1-score": 0.4827586206896552,
+            "support": 13.0
+          },
+          "BANKA": {
+            "precision": 0.9166666666666666,
+            "recall": 0.6875,
+            "f1-score": 0.7857142857142857,
+            "support": 16.0
+          },
+          "BALADYA": {
+            "precision": 0.9545454545454546,
+            "recall": 0.9545454545454546,
+            "f1-score": 0.9545454545454546,
+            "support": 22.0
+          },
+          "BOUSTA": {
+            "precision": 0.875,
+            "recall": 0.875,
+            "f1-score": 0.875,
+            "support": 8.0
+          },
+          "MA7KMA": {
+            "precision": 0.8,
+            "recall": 0.4444444444444444,
+            "f1-score": 0.5714285714285714,
+            "support": 9.0
+          },
+          "MOSTAWSAF": {
+            "precision": 0.8947368421052632,
+            "recall": 0.9444444444444444,
+            "f1-score": 0.918918918918919,
+            "support": 18.0
+          },
+          "SBITAR": {
+            "precision": 1.0,
+            "recall": 0.16666666666666666,
+            "f1-score": 0.2857142857142857,
+            "support": 6.0
+          },
+          "WZARA": {
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1-score": 0.3333333333333333,
+            "support": 5.0
+          },
+          "A7AD": {
+            "precision": 0.875,
+            "recall": 1.0,
+            "f1-score": 0.9333333333333333,
+            "support": 7.0
+          },
+          "THNIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "THLETH": {
+            "precision": 0.8571428571428571,
+            "recall": 1.0,
+            "f1-score": 0.9230769230769231,
+            "support": 12.0
+          },
+          "ERB3A": {
+            "precision": 0.9166666666666666,
+            "recall": 0.8461538461538461,
+            "f1-score": 0.88,
+            "support": 13.0
+          },
+          "5MIS": {
+            "precision": 0.9,
+            "recall": 0.9,
+            "f1-score": 0.9,
+            "support": 10.0
+          },
+          "JOM3A": {
+            "precision": 1.0,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.9523809523809523,
+            "support": 11.0
+          },
+          "SEBT": {
+            "precision": 1.0,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.9230769230769231,
+            "support": 7.0
+          },
+          "KARHBA": {
+            "precision": 0.6,
+            "recall": 1.0,
+            "f1-score": 0.75,
+            "support": 3.0
+          },
+          "TAXI": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 19.0
+          },
+          "TRAIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "LOUAGE": {
+            "precision": 0.8,
+            "recall": 1.0,
+            "f1-score": 0.8888888888888888,
+            "support": 8.0
+          },
+          "METRO": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+          },
+          "CAR": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "accuracy": 0.8867667121418826,
+          "macro avg": {
+            "precision": 0.8799206264760884,
+            "recall": 0.8612151325580469,
+            "f1-score": 0.855058164003995,
+            "support": 733.0
+          },
+          "weighted avg": {
+            "precision": 0.8962873662941995,
+            "recall": 0.8867667121418826,
+            "f1-score": 0.8827294008704089,
+            "support": 733.0
+          }
+        },
+        "worst_confusions": [
+          {
+            "true": "DAR",
+            "predicted": "BENT",
+            "count": 3
+          },
+          {
+            "true": "BENT",
+            "predicted": "EBEN",
+            "count": 3
+          },
+          {
+            "true": "O5T",
+            "predicted": "5OU",
+            "count": 2
+          },
+          {
+            "true": "MA7KMA",
+            "predicted": "DAR",
+            "count": 2
+          },
+          {
+            "true": "WZARA",
+            "predicted": "ENTI",
+            "count": 2
+          },
+          {
+            "true": "ERB3A",
+            "predicted": "DAR",
+            "count": 2
+          },
+          {
+            "true": "BANKA",
+            "predicted": "THLETH",
+            "count": 2
+          },
+          {
+            "true": "5AL_3AM",
+            "predicted": "LOUAGE",
+            "count": 2
+          },
+          {
+            "true": "SE7A",
+            "predicted": "MOSTAWSAF",
+            "count": 2
+          },
+          {
+            "true": "T7EB",
+            "predicted": "KARHBA",
+            "count": 2
+          }
+        ]
+      },
+      "training_time_s": 6.71
+    },
+    "RandomForest": {
+      "cross_validation": {
+        "accuracy": {
+          "test_mean": 0.9132761588051691,
+          "test_std": 0.008235875858063896,
+          "train_mean": 0.9992318998279677,
+          "train_std": 0.0006826849310839603,
+          "overfit_gap": 0.08595574102279857
+        },
+        "precision": {
+          "test_mean": 0.9209661800428217,
+          "test_std": 0.008426302451630984,
+          "train_mean": 0.9992462462385976,
+          "train_std": 0.0006687907644795128,
+          "overfit_gap": 0.07828006619577588
+        },
+        "recall": {
+          "test_mean": 0.9132761588051691,
+          "test_std": 0.008235875858063896,
+          "train_mean": 0.9992318998279677,
+          "train_std": 0.0006826849310839603,
+          "overfit_gap": 0.08595574102279857
+        },
+        "f1": {
+          "test_mean": 0.911071082489169,
+          "test_std": 0.008479004648877441,
+          "train_mean": 0.9992324649642411,
+          "train_std": 0.000682180017498369,
+          "overfit_gap": 0.0881613824750721
+        }
+      },
+      "test_evaluation": {
+        "accuracy": 0.9345156889495225,
+        "top_k_accuracy": 0.9795361527967258,
+        "k": 3,
+        "per_class": {
+          "3ASLEMA": {
+            "precision": 0.7272727272727273,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.8,
+            "support": 9.0
+          },
+          "MAR7BA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+          },
+          "LABES": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 4.0
+          },
+          "NEKTEBLK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 11.0
+          },
+          "OUI": {
+            "precision": 0.9473684210526315,
+            "recall": 1.0,
+            "f1-score": 0.972972972972973,
+            "support": 18.0
+          },
+          "NON": {
+            "precision": 1.0,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.9230769230769231,
+            "support": 14.0
+          },
+          "ENTI": {
+            "precision": 0.7777777777777778,
+            "recall": 0.6363636363636364,
+            "f1-score": 0.7,
+            "support": 11.0
+          },
+          "ASSAM": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+          },
+          "T7EB": {
+            "precision": 1.0,
+            "recall": 0.75,
+            "f1-score": 0.8571428571428571,
+            "support": 8.0
+          },
+          "TA3RAF": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+          },
+          "TA9RA": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1-score": 0.9333333333333333,
+            "support": 8.0
+          },
+          "N3AWNEK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 17.0
+          },
+          "LYOUM": {
+            "precision": 1.0,
+            "recall": 0.9,
+            "f1-score": 0.9473684210526315,
+            "support": 10.0
+          },
+          "DEMANDE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "5ADAMET": {
+            "precision": 0.8,
+            "recall": 1.0,
+            "f1-score": 0.8888888888888888,
+            "support": 4.0
+          },
+          "TA3LIM": {
+            "precision": 0.9375,
+            "recall": 1.0,
+            "f1-score": 0.967741935483871,
+            "support": 15.0
+          },
+          "RADIO": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 23.0
+          },
+          "TELVZA": {
+            "precision": 0.8571428571428571,
+            "recall": 1.0,
+            "f1-score": 0.9230769230769231,
+            "support": 6.0
+          },
+          "THA9AFA": {
+            "precision": 1.0,
+            "recall": 0.9166666666666666,
+            "f1-score": 0.9565217391304348,
+            "support": 12.0
+          },
+          "CHABEB": {
+            "precision": 0.7857142857142857,
+            "recall": 1.0,
+            "f1-score": 0.88,
+            "support": 11.0
+          },
+          "SE7A": {
+            "precision": 0.875,
+            "recall": 0.8235294117647058,
+            "f1-score": 0.8484848484848485,
+            "support": 17.0
+          },
+          "SIYE7A": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 10.0
+          },
+          "BARNAMJK": {
+            "precision": 0.9473684210526315,
+            "recall": 1.0,
+            "f1-score": 0.972972972972973,
+            "support": 18.0
+          },
+          "CV": {
+            "precision": 0.9166666666666666,
+            "recall": 1.0,
+            "f1-score": 0.9565217391304348,
+            "support": 11.0
+          },
+          "OM": {
+            "precision": 0.8,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.8421052631578947,
+            "support": 9.0
+          },
+          "BOU": {
+            "precision": 0.9310344827586207,
+            "recall": 1.0,
+            "f1-score": 0.9642857142857143,
+            "support": 27.0
+          },
+          "BENT": {
+            "precision": 0.96875,
+            "recall": 0.9393939393939394,
+            "f1-score": 0.9538461538461539,
+            "support": 33.0
+          },
+          "EBEN": {
+            "precision": 0.9285714285714286,
+            "recall": 0.896551724137931,
+            "f1-score": 0.9122807017543859,
+            "support": 29.0
+          },
+          "O5T": {
+            "precision": 0.88,
+            "recall": 0.8461538461538461,
+            "f1-score": 0.8627450980392157,
+            "support": 26.0
+          },
+          "5OU": {
+            "precision": 0.9230769230769231,
+            "recall": 0.972972972972973,
+            "f1-score": 0.9473684210526315,
+            "support": 37.0
+          },
+          "MAR2A": {
+            "precision": 0.9545454545454546,
+            "recall": 1.0,
+            "f1-score": 0.9767441860465116,
+            "support": 21.0
+          },
+          "TFOL": {
+            "precision": 0.9166666666666666,
+            "recall": 0.9166666666666666,
+            "f1-score": 0.9166666666666666,
+            "support": 12.0
+          },
+          "3AYLA": {
+            "precision": 0.9166666666666666,
+            "recall": 1.0,
+            "f1-score": 0.9565217391304348,
+            "support": 11.0
+          },
+          "JAD": {
+            "precision": 1.0,
+            "recall": 0.8421052631578947,
+            "f1-score": 0.9142857142857143,
+            "support": 19.0
+          },
+          "JADDA": {
+            "precision": 0.9285714285714286,
+            "recall": 0.9285714285714286,
+            "f1-score": 0.9285714285714286,
+            "support": 14.0
+          },
+          "5AL_3AM": {
+            "precision": 0.9473684210526315,
+            "recall": 0.9473684210526315,
+            "f1-score": 0.9473684210526315,
+            "support": 38.0
+          },
+          "DAR": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 13.0
+          },
+          "BANKA": {
+            "precision": 0.9230769230769231,
+            "recall": 0.75,
+            "f1-score": 0.8275862068965517,
+            "support": 16.0
+          },
+          "BALADYA": {
+            "precision": 0.9545454545454546,
+            "recall": 0.9545454545454546,
+            "f1-score": 0.9545454545454546,
+            "support": 22.0
+          },
+          "BOUSTA": {
+            "precision": 0.8571428571428571,
+            "recall": 0.75,
+            "f1-score": 0.8,
+            "support": 8.0
+          },
+          "MA7KMA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 9.0
+          },
+          "MOSTAWSAF": {
+            "precision": 0.9444444444444444,
+            "recall": 0.9444444444444444,
+            "f1-score": 0.9444444444444444,
+            "support": 18.0
+          },
+          "SBITAR": {
+            "precision": 1.0,
+            "recall": 0.16666666666666666,
+            "f1-score": 0.2857142857142857,
+            "support": 6.0
+          },
+          "WZARA": {
+            "precision": 0.7142857142857143,
+            "recall": 1.0,
+            "f1-score": 0.8333333333333334,
+            "support": 5.0
+          },
+          "A7AD": {
+            "precision": 0.875,
+            "recall": 1.0,
+            "f1-score": 0.9333333333333333,
+            "support": 7.0
+          },
+          "THNIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "THLETH": {
+            "precision": 0.8571428571428571,
+            "recall": 1.0,
+            "f1-score": 0.9230769230769231,
+            "support": 12.0
+          },
+          "ERB3A": {
+            "precision": 0.8125,
+            "recall": 1.0,
+            "f1-score": 0.896551724137931,
+            "support": 13.0
+          },
+          "5MIS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 10.0
+          },
+          "JOM3A": {
+            "precision": 1.0,
+            "recall": 0.8181818181818182,
+            "f1-score": 0.9,
+            "support": 11.0
+          },
+          "SEBT": {
+            "precision": 0.875,
+            "recall": 1.0,
+            "f1-score": 0.9333333333333333,
+            "support": 7.0
+          },
+          "KARHBA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+          },
+          "TAXI": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 19.0
+          },
+          "TRAIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "LOUAGE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 8.0
+          },
+          "METRO": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+          },
+          "CAR": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "accuracy": 0.9345156889495225,
+          "macro avg": {
+            "precision": 0.9207052785829413,
+            "recall": 0.9159667192221287,
+            "f1-score": 0.9102247737096856,
+            "support": 733.0
+          },
+          "weighted avg": {
+            "precision": 0.9384812058078543,
+            "recall": 0.9345156889495225,
+            "f1-score": 0.931813922104202,
+            "support": 733.0
+          }
+        },
+        "worst_confusions": [
+          {
+            "true": "O5T",
+            "predicted": "5OU",
+            "count": 3
+          },
+          {
+            "true": "BANKA",
+            "predicted": "THLETH",
+            "count": 2
+          },
+          {
+            "true": "SBITAR",
+            "predicted": "WZARA",
+            "count": 2
+          },
+          {
+            "true": "JOM3A",
+            "predicted": "A7AD",
+            "count": 1
+          },
+          {
+            "true": "5AL_3AM",
+            "predicted": "CHABEB",
+            "count": 1
+          },
+          {
+            "true": "BOUSTA",
+            "predicted": "5AL_3AM",
+            "count": 1
+          },
+          {
+            "true": "BALADYA",
+            "predicted": "ERB3A",
+            "count": 1
+          },
+          {
+            "true": "JAD",
+            "predicted": "JADDA",
+            "count": 1
+          },
+          {
+            "true": "JAD",
+            "predicted": "3AYLA",
+            "count": 1
+          },
+          {
+            "true": "BANKA",
+            "predicted": "5AL_3AM",
+            "count": 1
+          }
+        ]
+      },
+      "training_time_s": 11.1
+    },
+    "SVM": {
+      "cross_validation": {
+        "accuracy": {
+          "test_mean": 0.9139593360753769,
+          "test_std": 0.008857785390205717,
+          "train_mean": 0.981221859026743,
+          "train_std": 0.0027548480501853973,
+          "overfit_gap": 0.06726252295136603
+        },
+        "precision": {
+          "test_mean": 0.9229664255758803,
+          "test_std": 0.007971939579333207,
+          "train_mean": 0.9821464380311575,
+          "train_std": 0.0027051067257164406,
+          "overfit_gap": 0.059180012455277264
+        },
+        "recall": {
+          "test_mean": 0.9139593360753769,
+          "test_std": 0.008857785390205717,
+          "train_mean": 0.981221859026743,
+          "train_std": 0.0027548480501853973,
+          "overfit_gap": 0.06726252295136603
+        },
+        "f1": {
+          "test_mean": 0.9124443380943656,
+          "test_std": 0.007981435717383176,
+          "train_mean": 0.9811456238372994,
+          "train_std": 0.002792987220987345,
+          "overfit_gap": 0.06870128574293377
+        }
+      },
+      "test_evaluation": {
+        "accuracy": 0.9386084583901774,
+        "top_k_accuracy": 0.9795361527967258,
+        "k": 3,
+        "per_class": {
+          "3ASLEMA": {
+            "precision": 0.7,
+            "recall": 0.7777777777777778,
+            "f1-score": 0.7368421052631579,
+            "support": 9.0
+          },
+          "MAR7BA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+          },
+          "LABES": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 4.0
+          },
+          "NEKTEBLK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 11.0
+          },
+          "OUI": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 18.0
+          },
+          "NON": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 14.0
+          },
+          "ENTI": {
+            "precision": 0.6923076923076923,
+            "recall": 0.8181818181818182,
+            "f1-score": 0.75,
+            "support": 11.0
+          },
+          "ASSAM": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1-score": 0.6666666666666666,
+            "support": 2.0
+          },
+          "T7EB": {
+            "precision": 0.75,
+            "recall": 0.75,
+            "f1-score": 0.75,
+            "support": 8.0
+          },
+          "TA3RAF": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+          },
+          "TA9RA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 8.0
+          },
+          "N3AWNEK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 17.0
+          },
+          "LYOUM": {
+            "precision": 1.0,
+            "recall": 0.8,
+            "f1-score": 0.8888888888888888,
+            "support": 10.0
+          },
+          "DEMANDE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "5ADAMET": {
+            "precision": 0.8,
+            "recall": 1.0,
+            "f1-score": 0.8888888888888888,
+            "support": 4.0
+          },
+          "TA3LIM": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 15.0
+          },
+          "RADIO": {
+            "precision": 1.0,
+            "recall": 0.9565217391304348,
+            "f1-score": 0.9777777777777777,
+            "support": 23.0
+          },
+          "TELVZA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "THA9AFA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 12.0
+          },
+          "CHABEB": {
+            "precision": 0.9090909090909091,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.9090909090909091,
+            "support": 11.0
+          },
+          "SE7A": {
+            "precision": 0.8333333333333334,
+            "recall": 0.8823529411764706,
+            "f1-score": 0.8571428571428571,
+            "support": 17.0
+          },
+          "SIYE7A": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 10.0
+          },
+          "BARNAMJK": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 18.0
+          },
+          "CV": {
+            "precision": 1.0,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.9523809523809523,
+            "support": 11.0
+          },
+          "OM": {
+            "precision": 0.8888888888888888,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.8888888888888888,
+            "support": 9.0
+          },
+          "BOU": {
+            "precision": 0.9642857142857143,
+            "recall": 1.0,
+            "f1-score": 0.9818181818181818,
+            "support": 27.0
+          },
+          "BENT": {
+            "precision": 0.90625,
+            "recall": 0.8787878787878788,
+            "f1-score": 0.8923076923076924,
+            "support": 33.0
+          },
+          "EBEN": {
+            "precision": 0.9,
+            "recall": 0.9310344827586207,
+            "f1-score": 0.9152542372881356,
+            "support": 29.0
+          },
+          "O5T": {
+            "precision": 0.8518518518518519,
+            "recall": 0.8846153846153846,
+            "f1-score": 0.8679245283018868,
+            "support": 26.0
+          },
+          "5OU": {
+            "precision": 0.9459459459459459,
+            "recall": 0.9459459459459459,
+            "f1-score": 0.9459459459459459,
+            "support": 37.0
+          },
+          "MAR2A": {
+            "precision": 0.9130434782608695,
+            "recall": 1.0,
+            "f1-score": 0.9545454545454546,
+            "support": 21.0
+          },
+          "TFOL": {
+            "precision": 0.9166666666666666,
+            "recall": 0.9166666666666666,
+            "f1-score": 0.9166666666666666,
+            "support": 12.0
+          },
+          "3AYLA": {
+            "precision": 0.6875,
+            "recall": 1.0,
+            "f1-score": 0.8148148148148148,
+            "support": 11.0
+          },
+          "JAD": {
+            "precision": 1.0,
+            "recall": 0.8947368421052632,
+            "f1-score": 0.9444444444444444,
+            "support": 19.0
+          },
+          "JADDA": {
+            "precision": 1.0,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.9230769230769231,
+            "support": 14.0
+          },
+          "5AL_3AM": {
+            "precision": 1.0,
+            "recall": 0.9210526315789473,
+            "f1-score": 0.958904109589041,
+            "support": 38.0
+          },
+          "DAR": {
+            "precision": 0.9285714285714286,
+            "recall": 1.0,
+            "f1-score": 0.9629629629629629,
+            "support": 13.0
+          },
+          "BANKA": {
+            "precision": 0.8333333333333334,
+            "recall": 0.9375,
+            "f1-score": 0.8823529411764706,
+            "support": 16.0
+          },
+          "BALADYA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 22.0
+          },
+          "BOUSTA": {
+            "precision": 0.875,
+            "recall": 0.875,
+            "f1-score": 0.875,
+            "support": 8.0
+          },
+          "MA7KMA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 9.0
+          },
+          "MOSTAWSAF": {
+            "precision": 0.9444444444444444,
+            "recall": 0.9444444444444444,
+            "f1-score": 0.9444444444444444,
+            "support": 18.0
+          },
+          "SBITAR": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1-score": 0.6666666666666666,
+            "support": 6.0
+          },
+          "WZARA": {
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1-score": 0.3333333333333333,
+            "support": 5.0
+          },
+          "A7AD": {
+            "precision": 0.875,
+            "recall": 1.0,
+            "f1-score": 0.9333333333333333,
+            "support": 7.0
+          },
+          "THNIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "THLETH": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 12.0
+          },
+          "ERB3A": {
+            "precision": 0.9285714285714286,
+            "recall": 1.0,
+            "f1-score": 0.9629629629629629,
+            "support": 13.0
+          },
+          "5MIS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 10.0
+          },
+          "JOM3A": {
+            "precision": 1.0,
+            "recall": 0.9090909090909091,
+            "f1-score": 0.9523809523809523,
+            "support": 11.0
+          },
+          "SEBT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 7.0
+          },
+          "KARHBA": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+          },
+          "TAXI": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 19.0
+          },
+          "TRAIN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "LOUAGE": {
+            "precision": 0.8888888888888888,
+            "recall": 1.0,
+            "f1-score": 0.9411764705882353,
+            "support": 8.0
+          },
+          "METRO": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+          },
+          "CAR": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 6.0
+          },
+          "accuracy": 0.9386084583901774,
+          "macro avg": {
+            "precision": 0.9286486667445858,
+            "recall": 0.9085600530960374,
+            "f1-score": 0.909419035116448,
+            "support": 733.0
+          },
+          "weighted avg": {
+            "precision": 0.9439575420828016,
+            "recall": 0.9386084583901774,
+            "f1-score": 0.9371542993331287,
+            "support": 733.0
+          }
+        },
+        "worst_confusions": [
+          {
+            "true": "O5T",
+            "predicted": "5OU",
+            "count": 2
+          },
+          {
+            "true": "SBITAR",
+            "predicted": "3AYLA",
+            "count": 2
+          },
+          {
+            "true": "WZARA",
+            "predicted": "ENTI",
+            "count": 2
+          },
+          {
+            "true": "5OU",
+            "predicted": "O5T",
+            "count": 2
+          },
+          {
+            "true": "JADDA",
+            "predicted": "MAR2A",
+            "count": 2
+          },
+          {
+            "true": "EBEN",
+            "predicted": "SE7A",
+            "count": 2
+          },
+          {
+            "true": "BENT",
+            "predicted": "EBEN",
+            "count": 2
+          },
+          {
+            "true": "BANKA",
+            "predicted": "BENT",
+            "count": 1
+          },
+          {
+            "true": "JAD",
+            "predicted": "BOU",
+            "count": 1
+          },
+          {
+            "true": "TFOL",
+            "predicted": "EBEN",
+            "count": 1
+          }
+        ]
+      },
+      "training_time_s": 13.93
+    }
+  },
+  "neural_nets": {},
+  "unsupervised": {
+    "kmeans": {
+      "ari": 0.14096053088493443,
+      "nmi": 0.41641956701170435,
+      "purity": 0.2342,
+      "category_ari": null,
+      "category_nmi": null,
+      "n_clusters": 20,
+      "cluster_summary": [
+        {
+          "cluster": 8,
+          "size": 1,
+          "dominant_sign": "5AL_3AM",
+          "purity": 1.0
+        },
+        {
+          "cluster": 9,
+          "size": 3,
+          "dominant_sign": "3AYLA",
+          "purity": 1.0
+        },
+        {
+          "cluster": 11,
+          "size": 1,
+          "dominant_sign": "JAD",
+          "purity": 1.0
+        },
+        {
+          "cluster": 18,
+          "size": 2,
+          "dominant_sign": "3AYLA",
+          "purity": 1.0
+        },
+        {
+          "cluster": 10,
+          "size": 7,
+          "dominant_sign": "SBITAR",
+          "purity": 0.857
+        },
+        {
+          "cluster": 13,
+          "size": 4,
+          "dominant_sign": "3AYLA",
+          "purity": 0.5
+        },
+        {
+          "cluster": 14,
+          "size": 8,
+          "dominant_sign": "3AYLA",
+          "purity": 0.5
+        },
+        {
+          "cluster": 7,
+          "size": 60,
+          "dominant_sign": "3AYLA",
+          "purity": 0.417
+        },
+        {
+          "cluster": 5,
+          "size": 244,
+          "dominant_sign": "5OU",
+          "purity": 0.369
+        },
+        {
+          "cluster": 1,
+          "size": 3,
+          "dominant_sign": "TELVZA",
+          "purity": 0.333
+        }
+      ]
+    },
+    "pca": {
+      "explained_variance_ratio": [
+        0.2918,
+        0.13,
+        0.1244,
+        0.0925,
+        0.0799,
+        0.0661,
+        0.0406,
+        0.0353,
+        0.027,
+        0.0193,
+        0.0163,
+        0.0135,
+        0.0093,
+        0.0071,
+        0.0062,
+        0.0057,
+        0.0049,
+        0.0038,
+        0.0026,
+        0.0025
+      ],
+      "top2_cumulative_variance": 0.4219,
+      "n_components_for_95pct": 14
+    }
+  },
+  "best_model": {
+    "name": "SVM",
+    "accuracy": 0.9386
+  },
+  "learning_curve": {
+    "train_sizes": [
+      234,
+      468,
+      702,
+      937,
+      1171,
+      1405,
+      1640,
+      1874,
+      2108,
+      2343
+    ],
+    "train_mean": [
+      0.9487179487179487,
+      0.9589743589743589,
+      0.9643874643874643,
+      0.9705442902881536,
+      0.9725021349274124,
+      0.9730960854092527,
+      0.9751219512195121,
+      0.9766275346851655,
+      0.9789373814041745,
+      0.9812206572769953
+    ],
+    "train_std": [
+      0.008547008547008551,
+      0.005472755758489637,
+      0.006110430367386668,
+      0.003672283998737522,
+      0.0017417658458045225,
+      0.0043503791572772075,
+      0.00352183636053504,
+      0.002511974876401255,
+      0.0022371586570306573,
+      0.0027527982068454434
+    ],
+    "validation_mean": [
+      0.5868883638166914,
+      0.7156051457075348,
+      0.7893451182870979,
+      0.8210974008926227,
+      0.8463586243108427,
+      0.8678731658936437,
+      0.8866479974329803,
+      0.8962072284939179,
+      0.9040582246725591,
+      0.9139593360753769
+    ],
+    "validation_std": [
+      0.03255593052833917,
+      0.02561675773286851,
+      0.01165545978523827,
+      0.012115050787154316,
+      0.01119196531136834,
+      0.006157953843982583,
+      0.01019125330121549,
+      0.009029336342453967,
+      0.00966889564753647,
+      0.008857785390205717
+    ]
+  }
+}

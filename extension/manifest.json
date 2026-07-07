@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "SignBridge",
   "short_name": "SignBridge",
-  "version": "1.0.0",
-  "description": "Real-time ASL avatar overlay for YouTube, Google Meet, Zoom & Teams. Accessibility for Deaf exchange students — part of LinguaBridge Academy.",
+  "version": "2.0.0",
+  "description": "Real-time ASL sign language bridge for Deaf accessibility — 3D avatar overlay on YouTube, Google Meet, Zoom & Teams.",
 
   "permissions": [
     "tabCapture",
@@ -18,10 +18,13 @@
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://zoom.us/*",
+    "https://app.zoom.us/*",
     "https://meet.google.com/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*",
-    "https://teams.cloud.microsoft/*"
+    "https://teams.cloud.microsoft/*",
+    "https://web.microsoftstream.com/*",
+    "https://www.coursera.org/*"
   ],
 
   "background": {
@@ -33,10 +36,13 @@
       "matches": [
         "https://www.youtube.com/*",
         "https://zoom.us/*",
+        "https://app.zoom.us/*",
         "https://meet.google.com/*",
         "https://teams.microsoft.com/*",
         "https://teams.live.com/*",
-        "https://teams.cloud.microsoft/*"
+        "https://teams.cloud.microsoft/*",
+        "https://web.microsoftstream.com/*",
+        "https://www.coursera.org/*"
       ],
       "js": [
         "content/platform-detector.js",
@@ -73,16 +79,42 @@
     "128": "icons/icon128.png"
   },
 
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' https://3dasl-avatar.vercel.app; style-src 'self' https://3dasl-avatar.vercel.app; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com https://3dasl-avatar.vercel.app; object-src 'self'"
+  },
+
   "web_accessible_resources": [
     {
-      "resources": ["content/overlay.css", "icons/*", "content/vocab-10k.json"],
+      "resources": [
+        "content/overlay.css",
+        "icons/*",
+        "content/vocab-10k.json",
+        "3d/cwasa-embed.html",
+        "3d/cwaclientcfg.json",
+        "3d/avatar3d.html",
+        "3d/avatar3d.js",
+        "3d/pose-library.js",
+        "3d/procedural-hand.js",
+        "3d/lib/three.module.js",
+        "3d/lib/GLTFLoader.js",
+        "3d/lib/BufferGeometryUtils.js",
+        "3d/models/avatar.glb",
+        "d2/recognizer.html",
+        "d2/recognizer.js",
+        "d2/classifier.js",
+        "d2/lib/mediapipe-vision.mjs",
+        "d2/models/gesture_recognizer.task"
+      ],
       "matches": [
         "https://www.youtube.com/*",
         "https://zoom.us/*",
+        "https://app.zoom.us/*",
         "https://meet.google.com/*",
         "https://teams.microsoft.com/*",
         "https://teams.live.com/*",
-        "https://teams.cloud.microsoft/*"
+        "https://teams.cloud.microsoft/*",
+        "https://web.microsoftstream.com/*",
+        "https://www.coursera.org/*"
       ]
     }
   ],
@@ -95,6 +127,10 @@
     "toggle-captions": {
       "suggested_key": { "default": "Alt+Shift+C" },
       "description": "Toggle caption display"
+    },
+    "toggle-sign-recognition": {
+      "suggested_key": { "default": "Alt+Shift+R" },
+      "description": "Toggle sign-to-text recognition (Direction 2)"
     }
   }
 }

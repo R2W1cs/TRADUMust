@@ -80,7 +80,7 @@ export function VisualGlossBoard({
     <div className={`flex flex-col items-center gap-4 ${className}`}>
       <Signer2D word={active?.word ?? ""} tag={active?.tag} className="w-56 h-56" />
       <div className={`h-6 transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0"}`}>
-        <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+        <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
           {active?.word ?? "​"}
         </span>
       </div>

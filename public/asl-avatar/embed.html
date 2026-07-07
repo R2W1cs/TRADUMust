@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D ASL Avatar</title>
+  <link rel="preload" href="/asl-avatar/cwa/allcsa.js" as="script" />
+  <link rel="preload" href="/asl-avatar/avatars/anna.jar" as="fetch" crossorigin />
+  <link rel="stylesheet" href="/asl-avatar/cwa/cwasa.css" id="cwasa-css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: #0f172a; overflow: hidden; }
+    .shell { display: flex; flex-direction: column; width: 100%; height: 100%; }
+    .avatar-wrap { flex: 1; min-height: 0; padding: 8px; }
+    .CWASAAvatar { width: 100% !important; height: 100% !important; }
+    .CWASAAvMenu { display: none !important; }
+    .controls { padding: 10px 12px 14px; background: rgba(15, 23, 42, 0.95); border-top: 1px solid rgba(255,255,255,0.08); }
+    .controls.embed-hidden { display: none; }
+    #glossInput {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: #f8fafc;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .btn-row { display: flex; gap: 8px; }
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #btnSign { background: #6366f1; color: white; }
+    #btnReset { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="SToCA"></div>
+  <div class="shell">
+    <div class="avatar-wrap">
+      <div class="CWASAAvatar av0" align="center"></div>
+      <div class="CWASAAvMenu av0"></div>
+    </div>
+    <div class="controls" id="controls">
+      <input type="text" id="glossInput" placeholder="Enter words to sign…" />
+      <div class="btn-row">
+        <button type="button" id="btnSign">Sign</button>
+        <button type="button" id="btnReset">Reset</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function loadCwasaAssets() {
+      const REMOTE = "https://3dasl-avatar.vercel.app";
+      const LOCAL_JS = "/asl-avatar/cwa/allcsa.js";
+      const REMOTE_JS = REMOTE + "/cwa/allcsa.js";
+      const css = document.getElementById("cwasa-css");
+
+      window.__CWASA_ASSET_ROOT__ = new URL(".", window.location.href).href;
+      window.__CWASA_SIGML_BASE__ = REMOTE + "/sigml/";
+
+      css.onerror = function () {
+        css.onerror = null;
+        css.href = REMOTE + "/cwa/cwasa.css";
+      };
+
+      function loadScript(src, fallback) {
+        const el = document.createElement("script");
+        el.src = src;
+        el.onload = function () { bootCwasa(); };
+        el.onerror = function () {
+          if (fallback) loadScript(fallback, null);
+        };
+        document.body.appendChild(el);
+      }
+
+      loadScript(LOCAL_JS, REMOTE_JS);
+    })();
+
+    const VALID_AVATARS = ["anna", "marc", "francoise"];
+    let SIGML_BASE = "https://3dasl-avatar.vercel.app/sigml/";
+    let playingTimeout = null;
+    let stopRequested = false;
+    let cwasaReady = false;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("embed") === "1") {
+      document.getElementById("controls").classList.add("embed-hidden");
+    }
+
+    const requestedAvatar = (params.get("avatar") || "anna").toLowerCase();
+    const initAvatar = VALID_AVATARS.includes(requestedAvatar) ? requestedAvatar : "anna";
+
+    function notifyReady() {
+      if (cwasaReady) return;
+      cwasaReady = true;
+      window.parent.postMessage({ type: "TRADUMUST_READY", avatar: getCurrentAvatar() }, "*");
+    }
+
+    function getAvatarMenuSelect() {
+      const menu = document.querySelector(".CWASAAvMenu.av0");
+      return menu ? menu.querySelector("select") : null;
+    }
+
+    function getCurrentAvatar() {
+      const sel = getAvatarMenuSelect();
+      return sel ? sel.value : initAvatar;
+    }
+
+    function setAvatar(name) {
+      const id = String(name || "").toLowerCase();
+      if (!VALID_AVATARS.includes(id)) return false;
+      const sel = getAvatarMenuSelect();
+      if (!sel) return false;
+      if (sel.value === id) return true;
+      sel.value = id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      window.parent.postMessage({ type: "TRADUMUST_AVATAR", avatar: id }, "*");
+      return true;
+    }
+
+    function bootCwasa() {
+      SIGML_BASE = window.__CWASA_SIGML_BASE__ || SIGML_BASE;
+      const assetRoot = window.__CWASA_ASSET_ROOT__ || new URL(".", window.location.href).href;
+
+      CWASA.init({
+        jasBase: assetRoot,
+        cwaBase: new URL("cwa/", assetRoot).href,
+        useClientConfig: true,
+        useCwaConfig: true,
+        avSettings: [{
+          width: 640,
+          height: 520,
+          avList: "avs",
+          initAv: initAvatar,
+          allowFrameSteps: false,
+          allowSiGMLText: false,
+          initSiGMLURL: null,
+          background: null,
+        }],
+      });
+
+      if (CWASA.ready && typeof CWASA.ready.then === "function") {
+        CWASA.ready.then(() => setTimeout(notifyReady, 50)).catch(() => setTimeout(notifyReady, 1200));
+      } else {
+        setTimeout(notifyReady, 1200);
+      }
+
+      if (typeof CWASA.addHook === "function") {
+        CWASA.addHook("avatarready", () => notifyReady(), 0);
+      }
+
+      const initialText = params.get("text");
+      if (initialText) {
+        document.getElementById("glossInput").value = decodeURIComponent(initialText);
+        CWASA.ready?.then?.(() => setTimeout(playGloss, 300));
+      }
+    }
+
+    function playSiGML(sigmlURL) {
+      CWASA.playSiGMLURL(sigmlURL);
+    }
+
+    function isValidGloss(gloss) {
+      let ok = false;
+      const req = new XMLHttpRequest();
+      req.open("HEAD", SIGML_BASE + encodeURI(gloss) + ".sigml", false);
+      req.onload = function () { ok = req.status === 200; };
+      req.onerror = function () { ok = false; };
+      try { req.send(); } catch (e) { ok = false; }
+      return ok;
+    }
+
+    function findGlosses(input) {
+      const words = input.trim().split(/\s+/).filter(Boolean);
+      const glosses = [];
+      for (let i = 0; i < words.length; i++) {
+        let matched = false;
+        for (let len = Math.min(3, words.length - i); len >= 1; len--) {
+          const potential = words.slice(i, i + len).join(" ");
+          if (isValidGloss(potential)) {
+            glosses.push(potential);
+            i += len - 1;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched && isValidGloss(words[i])) {
+          glosses.push(words[i]);
+        }
+      }
+      return glosses;
+    }
+
+    function playGlossesSequentially(glosses, index) {
+      if (index >= glosses.length || stopRequested) {
+        window.parent.postMessage({ type: "TRADUMUST_DONE", glosses }, "*");
+        return;
+      }
+      const url = SIGML_BASE + encodeURI(glosses[index]) + ".sigml";
+      playSiGML(url);
+      window.parent.postMessage({ type: "TRADUMUST_SIGNING", gloss: glosses[index], index }, "*");
+      playingTimeout = setTimeout(() => playGlossesSequentially(glosses, index + 1), 1650);
+    }
+
+    function playGloss() {
+      stopRequested = false;
+      const input = document.getElementById("glossInput").value;
+      const glosses = findGlosses(input);
+      if (!glosses.length) {
+        window.parent.postMessage({ type: "TRADUMUST_ERROR", message: "No matching signs found" }, "*");
+        return;
+      }
+      playGlossesSequentially(glosses, 0);
+    }
+
+    function resetGloss() {
+      document.getElementById("glossInput").value = "";
+      stopRequested = true;
+      clearTimeout(playingTimeout);
+      window.parent.postMessage({ type: "TRADUMUST_RESET" }, "*");
+    }
+
+    document.getElementById("btnSign").addEventListener("click", playGloss);
+    document.getElementById("btnReset").addEventListener("click", resetGloss);
+
+    window.addEventListener("message", (e) => {
+      const data = e.data;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "TRADUMUST_PLAY" && data.text) {
+        document.getElementById("glossInput").value = data.text;
+        playGloss();
+      }
+      if (data.type === "TRADUMUST_PLAY_GLOSSES" && Array.isArray(data.glosses)) {
+        if (data.sigmlBase) SIGML_BASE = data.sigmlBase;
+        document.getElementById("glossInput").value = data.glosses.join(" ");
+        playGlossesSequentially(data.glosses, 0);
+      }
+      if (data.type === "TRADUMUST_RESET") resetGloss();
+      if (data.type === "TRADUMUST_SET_AVATAR" && data.avatar) setAvatar(data.avatar);
+    });
+  </script>
+</body>
+</html>

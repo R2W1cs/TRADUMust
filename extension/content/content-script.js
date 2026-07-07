@@ -36,6 +36,9 @@
   }
 
   async function boot() {
+    // Only inject overlay in the top frame (avoid duplicate/hidden overlays in iframes)
+    if (window !== window.top) return;
+
     await ensureModules();
     if (!SB || !SB.PlatformDetector) {
       console.error('[SignBridge] Core modules failed to load. Extension disabled.');
@@ -102,22 +105,20 @@
 
           vid.addEventListener('pause', () => {
             AvatarOverlay.pauseSigning();
-            AudioProcessor.stop();
+            stopCapture();
           });
 
           vid.addEventListener('play', () => {
             AvatarOverlay.resumeSigning();
             const settings = StorageManager.getAll();
             settings.then(s => {
-              if (!captureActive) {
-                captureActive = true;
-                AudioProcessor.start(onTextReceived, s.captionSource || 'auto');
-              }
+              startCapture(s);
             });
           });
 
           vid.addEventListener('ended', () => {
             AvatarOverlay.pauseSigning();
+            stopCapture();
           });
         }
       }
@@ -217,13 +218,21 @@
     switch (message.type) {
 
       case 'TOGGLE_AVATAR':
-        if (message.enabled === false || AvatarOverlay._visible) {
+        if (message.enabled === true) {
+          AvatarOverlay.show();
+        } else if (message.enabled === false) {
           AvatarOverlay.hide();
         } else {
-          AvatarOverlay.show();
+          AvatarOverlay.toggle();
         }
         sendResponse({ ok: true });
         break;
+
+      case 'TOGGLE_AVATAR_MODE':
+        AvatarOverlay.setAvatarMode(message.mode);
+        sendResponse({ ok: true });
+        break;
+
 
       case 'TOGGLE_CAPTIONS':
         StorageManager.get('showCaptions').then(({ showCaptions }) => {
@@ -255,6 +264,15 @@
             AvatarOverlay.clearQueue();
             AvatarOverlay.enqueueSign({ ...sign, _key: message.key, _word: sign.gloss || message.key });
           }
+        }
+        sendResponse({ ok: true });
+        break;
+
+      case 'TOGGLE_SIGN_RECOGNITION':
+        if (message.enabled) {
+          AvatarOverlay.enableSignRecognition();
+        } else {
+          AvatarOverlay.disableSignRecognition();
         }
         sendResponse({ ok: true });
         break;
@@ -306,31 +324,10 @@
   // Boot
   boot();
 
-  // ── DevTools bridge ───────────────────────────────────────────────────────
-  // Content scripts run in an ISOLATED world — window.SignBridge is not visible
-  // to the page's DevTools console directly.
-  // This injects a MAIN-world marker + a postMessage-based helper.
-  // In DevTools: window.SignBridgeDebug.textToSigns("hello world")
-  //   → dispatches a CustomEvent, isolated world handles it, logs result.
-  try {
-    const bridge = document.createElement('script');
-    bridge.textContent = `
-      window.__SignBridgeLoaded = true;
-      window.SignBridgeDebug = {
-        textToSigns: function(text) {
-          window.dispatchEvent(new CustomEvent('__sb_debug_tts', { detail: { text } }));
-          console.info('[SignBridge] textToSigns("' + text + '") — see __sb_debug_result event');
-        }
-      };
-    `;
-    (document.head || document.documentElement).appendChild(bridge);
-    bridge.remove();
-
-    // Listen in isolated world and respond with the result
-    window.addEventListener('__sb_debug_tts', (e) => {
-      const result = SB.SignMapper.textToSigns(e.detail.text);
-      console.log('[SignBridge] textToSigns result:', result.map(s => s._word || s.gloss || s._key));
-    });
-  } catch (_) {}
+  // ── DevTools bridge (isolated-world only) ────────────────────────────────
+  // Call from the extension's background/service-worker DevTools context:
+  //   chrome.tabs.sendMessage(tabId, { type: 'PREVIEW_SIGN', key: 'HELLO' })
+  // The inline script injection is intentionally omitted — YouTube/Meet have
+  // strict CSPs that block it and it produces noisy console violations.
 
 })();

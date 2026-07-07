@@ -56,6 +56,15 @@
 <section class="sb-card">
   <div class="sb-section-title">Settings</div>
 
+  <!-- Avatar mode -->
+  <div class="sb-row">
+    <label class="sb-label-sm" for="mode-select">Avatar style</label>
+    <select id="mode-select" class="sb-select">
+      <option value="2d" selected>2D Vector (clearest)</option>
+      <option value="3d-cwasa">3D CWASA Avatar</option>
+    </select>
+  </div>
+
   <!-- Animation speed -->
   <div class="sb-row">
     <label class="sb-label-sm" for="speed-select">Sign speed</label>
@@ -91,6 +100,20 @@
     <label class="sb-label-sm">Show sign hints</label>
     <label class="sb-switch sb-switch--sm">
       <input type="checkbox" id="toggle-hints" checked/>
+      <span class="sb-thumb"></span>
+    </label>
+  </div>
+</section>
+
+<!-- ── Direction 2: Sign Recognition ────────────────────────────────────── -->
+<section class="sb-card">
+  <div class="sb-toggle-row">
+    <div>
+      <div class="sb-label">Sign Recognition <span style="font-size:9px;background:#4f46e5;color:#fff;padding:1px 6px;border-radius:4px;margin-left:4px;letter-spacing:.5px;">D2</span></div>
+      <div class="sb-sublabel">Webcam → ASL → text captions</div>
+    </div>
+    <label class="sb-switch" title="Toggle sign-to-text">
+      <input type="checkbox" id="toggle-sign-recognition"/>
       <span class="sb-thumb"></span>
     </label>
   </div>

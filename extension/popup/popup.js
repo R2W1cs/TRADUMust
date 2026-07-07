@@ -31,15 +31,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── Load settings from storage ────────────────────────────────────────────────
 async function loadSettings() {
   const s = await storageGet([
-    'avatarEnabled', 'showCaptions', 'showHints',
-    'animationSpeed', 'captionSource',
+    'avatarEnabled', 'avatarMode', 'showCaptions', 'showHints',
+    'animationSpeed', 'captionSource', 'signRecognitionEnabled',
   ]);
 
-  el('toggle-avatar').checked   = s.avatarEnabled   ?? true;
-  el('toggle-captions').checked = s.showCaptions    ?? true;
-  el('toggle-hints').checked    = s.showHints       ?? true;
-  el('speed-select').value      = String(s.animationSpeed ?? 1.0);
-  el('source-select').value     = s.captionSource   ?? 'auto';
+  el('toggle-avatar').checked             = s.avatarEnabled            ?? true;
+  let mode = s.avatarMode ?? '2d';
+  if (mode === '3d' || mode === '3d-hands' || mode === '3d-model') mode = '3d-cwasa';
+  el('mode-select').value                 = mode;
+  el('toggle-captions').checked           = s.showCaptions             ?? true;
+  el('toggle-hints').checked              = s.showHints                ?? true;
+  el('speed-select').value                = String(s.animationSpeed    ?? 1.0);
+  el('source-select').value               = s.captionSource            ?? 'auto';
+  el('toggle-sign-recognition').checked   = s.signRecognitionEnabled   ?? false;
+
 
   updateBadge(s.avatarEnabled);
 }
@@ -87,6 +92,12 @@ function attachListeners() {
     await sendToActiveTab({ type: 'TOGGLE_AVATAR', enabled });
   });
 
+  el('mode-select').addEventListener('change', async (e) => {
+    const mode = e.target.value;
+    await chrome.storage.sync.set({ avatarMode: mode });
+    await sendToActiveTab({ type: 'TOGGLE_AVATAR_MODE', mode });
+  });
+
   el('toggle-captions').addEventListener('change', async (e) => {
     await chrome.storage.sync.set({ showCaptions: e.target.checked });
   });
@@ -101,6 +112,12 @@ function attachListeners() {
 
   el('source-select').addEventListener('change', async (e) => {
     await chrome.storage.sync.set({ captionSource: e.target.value });
+  });
+
+  el('toggle-sign-recognition').addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    await chrome.storage.sync.set({ signRecognitionEnabled: enabled });
+    await sendToActiveTab({ type: 'TOGGLE_SIGN_RECOGNITION', enabled });
   });
 
   el('btn-sidepanel').addEventListener('click', async () => {

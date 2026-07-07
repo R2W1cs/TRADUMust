@@ -22,7 +22,9 @@
     DEFAULTS: {
       // Avatar display
       avatarEnabled:     true,
+      avatarMode:        '2d',        // '2d' | '3d-hands' | '3d-model'
       avatarSize:        280,         // px, width of avatar overlay
+
       avatarOpacity:     0.95,
       avatarPosition:    { x: 20, y: 120 },  // px from top-left of viewport
 

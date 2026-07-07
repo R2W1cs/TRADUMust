@@ -1,0 +1,17 @@
+{
+  "description": "TRADUMUST CWASA embed — anna, marc, francoise",
+  "animgenServer": null,
+  "avs": ["anna", "marc", "francoise"],
+  "avSettings": [
+    {
+      "width": 640,
+      "height": 520,
+      "avList": "avs",
+      "initAv": "anna",
+      "allowFrameSteps": false,
+      "allowSiGMLText": false,
+      "initSiGMLURL": null,
+      "background": null
+    }
+  ]
+}

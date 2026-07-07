@@ -440,8 +440,8 @@ function LetterCard({ letter, active = false }: { letter: string; active?: boole
     <div className={`
       flex flex-col items-center gap-1.5 rounded-xl border transition-all duration-300
       ${active
-        ? "border-purple-400 bg-purple-50 shadow-lg shadow-purple-100 scale-110"
-        : "border-slate-200 bg-white shadow-sm"}
+        ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 shadow-md scale-110"
+        : "border-[var(--border)] bg-[var(--surface)] shadow-sm"}
     `}>
       <svg
         viewBox="0 0 60 80"
@@ -451,7 +451,7 @@ function LetterCard({ letter, active = false }: { letter: string; active?: boole
       >
         {shape}
       </svg>
-      <span className={`text-xs font-black pb-1.5 tracking-widest ${active ? "text-purple-700" : "text-slate-600"}`}>
+      <span className={`text-xs font-black pb-1.5 tracking-widest ${active ? "text-[var(--brand-primary)]" : "text-[var(--text-secondary)]"}`}>
         {letter.toUpperCase()}
       </span>
     </div>
@@ -473,9 +473,9 @@ export function FingerspellBoard({ text, activeIndex = -1, className = "" }: Fin
 
   return (
     <div className={className}>
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-        <span className="w-4 h-4 rounded bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">✋</span>
-        Fingerspelling: <span className="text-purple-600">{text.toUpperCase()}</span>
+      <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-3 flex items-center gap-2">
+        <span className="w-4 h-4 rounded bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] flex items-center justify-center text-[10px]">✋</span>
+        Fingerspelling: <span className="text-[var(--brand-primary)]">{text.toUpperCase()}</span>
       </p>
       <div className="flex flex-wrap gap-2">
         {letters.map((letter, i) => (

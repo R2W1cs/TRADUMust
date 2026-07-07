@@ -156,7 +156,10 @@ describe('Fingerspelling alphabet', () => {
   });
 
   test('all FINGERSPELL_HANDS values are valid hand shapes', () => {
-    const VALID = new Set(['FLAT','FIST','POINT','V','C','OK','THUMB_UP','ILY','CLAW','HORNS','L','A','O']);
+    const VALID = new Set([
+      'FLAT','FIST','POINT','V','C','OK','THUMB_UP','ILY','CLAW','HORNS','L','A','O',
+      'X','BENT_V','PINCH_MID','OPEN_5','H','W','Y','PINKY','R'
+    ]);
     const bad = [];
     for (const [letter, shape] of Object.entries(SM.FINGERSPELL_HANDS)) {
       if (!VALID.has(shape)) bad.push(`'${letter}' → '${shape}'`);

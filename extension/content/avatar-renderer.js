@@ -149,6 +149,76 @@
       <ellipse cx="0" cy="-12" rx="11" ry="14" stroke="${SKS}" stroke-width="0.8" fill="none"/>
       ${palm(22, 11)}
     </g>`,
+
+    // index + middle + ring extended; pinky folded — ASL "W" / number 3
+    W: `<g>${palm()}
+      ${finger(8,   -7, -30)}
+      ${finger(2.5, -7, -33)}
+      ${finger(-2.5,-7, -30)}
+      ${knuckle(-8,-9)}
+      <path d="M -13 2 Q -20 0 -20 7" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // bent V — index + middle curved inward (SEE / LOOK / WATCH)
+    BENT_V: `<g>${palm()}
+      <path d="M 8 -7 Q 16 -14 11 -22" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+      <path d="M 2.5 -7 Q 9 -13 5 -20" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+      ${knuckle(-8,-9)}${knuckle(-2.5,-10)}
+      <path d="M -13 2 Q -20 0 -20 7" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // middle + thumb pinch circle; index / ring / pinky spread — LIKE / FEEL / EXCITED
+    PINCH_MID: `<g>${palm()}
+      <circle cx="2" cy="-12" r="8" stroke="${SK}" stroke-width="6.5" fill="none"/>
+      <circle cx="2" cy="-12" r="8" stroke="${SKS}" stroke-width="0.7" fill="none"/>
+      ${finger(8,-7,-30)}${finger(-2.5,-7,-27)}${finger(-8,-7,-23)}
+    </g>`,
+
+    // hooked / bent index only — TEST / EXAM / CHANGE
+    X: `<g>${palm(26, 17)}
+      ${knuckle(-8,-9)}${knuckle(-2.5,-11)}${knuckle(2.5,-11)}
+      <path d="M 8 -9 Q 17 -15 13 -24 Q 8 -29 4 -22" stroke="${SK}" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <path d="M -13 3 Q -20 -3 -20 4" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // index + middle together side-by-side — NAME / H-handshape
+    H: `<g>${palm()}
+      ${finger(8,   -7, -32, 5.5)}
+      ${finger(2.5, -7, -32, 5.5)}
+      ${knuckle(-8,-9)}${knuckle(-2.5,-10)}
+      <path d="M -13 2 Q -20 0 -20 7" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // all 5 fingers spread wide — FIVE / FINISH / FEEL
+    OPEN_5: `<g>${palm(32, 15)}
+      ${finger( 9,  -7, -29, 5)}
+      ${finger( 3,  -7, -33, 5)}
+      ${finger(-3,  -7, -33, 5)}
+      ${finger(-9,  -7, -27, 5)}
+      <path d="M -15 0 Q -26 -7 -28 -3 Q -29 3 -25 5" fill="${SK}" stroke="${SKS}" stroke-width="0.6"/>
+    </g>`,
+
+    // thumb + pinky only — PHONE / PLAY / CALL (Y-handshape)
+    Y: `<g>${palm(26, 17)}
+      ${finger(-8, -7, -29)}
+      ${knuckle(-2.5,-9)}${knuckle(2.5,-9)}${knuckle(8,-9)}
+      <path d="M -14 3 Q -20 -2 -21 -12 Q -19 -23 -14 -23" stroke="${SK}" stroke-width="7" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // pinky only extended — ASL letter I / J
+    PINKY: `<g>${palm(26, 17)}
+      ${finger(-8, -7, -29)}
+      ${knuckle(-2.5,-9)}${knuckle(2.5,-9)}${knuckle(8,-9)}
+      <path d="M -13 3 Q -18 2 -18 8" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
+
+    // index + middle crossed — ASL letter R / RESPECT
+    R: `<g>${palm()}
+      <path d="M 8 -7 Q 5 -18 1 -30" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+      <path d="M 2.5 -7 Q 7 -16 11 -26" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+      ${knuckle(-8,-9)}${knuckle(-2.5,-10)}
+      <path d="M -13 2 Q -20 0 -20 7" stroke="${SK}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+    </g>`,
   };
 
   function renderHand(key, flip = false) {

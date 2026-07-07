@@ -1,70 +1,65 @@
 """
-TRADUMUST — FastAPI Backend
+SignBridge — FastAPI Backend
 =======================================
-MVP: All sign-language endpoints are mocked.
-Swap in real MediaPipe / model inference under PRODUCTION sections.
+Sign language recognition, classification, avatar animation, translation,
+text-to-sign conversion, phrasebook, and cultural-notes endpoints.
 
 Run with:
-    pip install fastapi uvicorn python-multipart
-    uvicorn main:app --reload --port 8000
+    uvicorn backend.main:app --reload --port 8001
 """
 
 from __future__ import annotations
 
 import base64
+import json
+import os
 import random
+import re
+import sqlite3
 import time
+import urllib.parse
+import urllib.request
 import uuid
-from typing import Any, Literal
-from collections import OrderedDict
+from typing import Any
 
 import asyncio
-import json
 
+import numpy as np
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from deep_translator import GoogleTranslator
-from textblob import TextBlob, Word
 
 # ── ML pipeline ───────────────────────────────────────────────────────────────
-import sys, os
+import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from backend.ml.feature_extractor import extract_holistic_features
-from backend.ml.train   import load_trained_model, run_training
-
-import numpy as np
+from backend.ml.train import load_trained_model, run_training
 
 # MediaPipe Holistic (lazy-loaded to avoid startup delay when not used)
-_mp_holistic  = None
+_mp_holistic = None
 _mp_solutions = None
 
+
 def _get_mp_holistic():
-    """
-    Lazy-load MediaPipe Holistic.
-    Returns the holistic module on success, or None if unavailable.
-    mediapipe >= 0.10.9 removed the legacy solutions API — we fall back
-    gracefully to mock landmarks when it's missing.
-    """
     global _mp_holistic, _mp_solutions
     if _mp_holistic is None:
         try:
             import mediapipe as mp
             import cv2 as _cv2  # noqa: F401 — verify opencv is present
-            _mp_solutions = getattr(mp, 'solutions', None)
-            if _mp_solutions is None or not hasattr(_mp_solutions, 'holistic'):
+            _mp_solutions = getattr(mp, "solutions", None)
+            if _mp_solutions is None or not hasattr(_mp_solutions, "holistic"):
                 raise AttributeError("mediapipe.solutions.holistic not available")
             _mp_holistic = _mp_solutions.holistic
         except (ImportError, AttributeError):
-            _mp_holistic = False   # sentinel: tried but unavailable
+            _mp_holistic = False
     return _mp_holistic if _mp_holistic is not False else None
 
-# ── App setup ────────────────────────────────────────────────────────────────
+
+# ── App setup ─────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="TRADUMUST API",
-    description="Translation, cultural context, and sign-language bridge endpoints.",
-    version="0.1.0",
-    mode="MVP (mock data — swap in real APIs for production)",
+    title="TRADUMUST AI API",
+    description="Sign language recognition, translation, and avatar animation microservice.",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -76,146 +71,471 @@ app.add_middleware(
         "http://127.0.0.1:3001",
         "http://localhost:1234",
         "http://127.0.0.1:1234",
+        "http://localhost:4000",
+        "http://127.0.0.1:4000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load trained model at startup (non-blocking — falls back to mock if missing)
-_ml_model   = None
-_ml_classes = None
+# ── ML models ─────────────────────────────────────────────────────────────────
+_ml_models: dict[str, tuple] = {}
 _lstm_model = None
+
+
+def _get_ml_model(language: str = "ASL"):
+    """Load and cache sklearn/torch model per sign language."""
+    lang = (language or "ASL").upper()
+    if lang not in _ml_models:
+        from backend.ml.train import load_trained_model
+        try:
+            _ml_models[lang] = load_trained_model(lang)
+        except FileNotFoundError as exc:
+            print(f"DEBUG: No model for {lang}: {exc}")
+            return None, None
+    return _ml_models[lang]
+
 
 @app.on_event("startup")
 def load_model():
-    global _ml_model, _ml_classes, _lstm_model
+    global _lstm_model
+    _init_db()
     try:
-        from backend.ml.train import load_trained_model, LSTM_PATH
-        from backend.ml.lstm_model import SignLanguageLSTM
+        from backend.ml.train import LSTM_PATH
+        from backend.ml.nn_model import SignBiLSTM
         import torch
-        
-        _ml_model, _ml_classes = load_trained_model()
-        
-        if LSTM_PATH.exists():
-            _lstm_model = SignLanguageLSTM(input_size=186, num_classes=len(_ml_classes))
-            _lstm_model.load_state_dict(torch.load(LSTM_PATH, map_location='cpu'))
+
+        _get_ml_model("ASL")
+        model, classes = _get_ml_model("ASL")
+        if model is not None and LSTM_PATH.exists() and classes:
+            _lstm_model = SignBiLSTM(input_dim=231, num_classes=len(classes), hidden_dim=256)
+            _lstm_model.load_state_dict(torch.load(LSTM_PATH, map_location="cpu"))
             _lstm_model.eval()
             print("OK LSTM model loaded")
-            
+
+        _get_ml_model("TSL")
     except Exception as e:
         print(f"DEBUG: Startup model loading info: {e}")
 
-# ── In-memory history & phrasebook store ─────────────────────────────────────
-# Keyed by entry id (32-char hex). OrderedDict preserves insertion order.
-# Persisted to backend/data/history.json to survive hot-reloads.
-HISTORY_FILE = os.path.join(os.path.dirname(__file__), "data", "history.json")
 
-def _load_history_store() -> OrderedDict[str, dict]:
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                pairs = json.load(f)
-                return OrderedDict(pairs)
-        except Exception as e:
-            print(f"DEBUG: Could not load persistence file: {e}")
-    return OrderedDict()
+# ── SQLite database ───────────────────────────────────────────────────────────
+_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "tradumust.sqlite")
 
-_history_store: OrderedDict[str, dict] = _load_history_store()
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS history_entries (
+    id TEXT PRIMARY KEY,
+    entry_type TEXT NOT NULL,
+    source_text TEXT NOT NULL,
+    translated_text TEXT,
+    source_lang TEXT,
+    target_lang TEXT,
+    sign_language TEXT,
+    cultural_note TEXT,
+    formality_level TEXT,
+    regional_variant TEXT,
+    sentiment_json TEXT,
+    metadata_json TEXT,
+    extra_json TEXT,
+    is_phrasebook INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_history_type ON history_entries (entry_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_history_phrasebook ON history_entries (is_phrasebook, created_at DESC);
+"""
 
-def _save_history_store():
+
+def _init_db() -> None:
+    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(_DB_PATH)
     try:
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            # Save as list of [id, entry] pairs to preserve OrderedDict order in JSON
-            json.dump(list(_history_store.items()), f, indent=2)
-    except Exception as e:
-        print(f"DEBUG: Could not save persistence file: {e}")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.executescript(_SCHEMA)
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def _make_entry(
-    entry_type: str,
-    source: str,
-    source_lang: str | None,
-    target_lang: str | None,
-    sign_language: str | None,
-    result: dict,
-    sentiment: dict | None = None,
-    metadata: list | None = None,
-    word_sequence: list | None = None,
-    extra: dict | None = None,
-) -> dict:
-    """Create and persist a new history entry, returned as a plain dict."""
-    entry_id = uuid.uuid4().hex  # 32 hex chars
-    ts = int(time.time())
-    entry: dict[str, Any] = {
-        "id": entry_id,
-        "entry_type": entry_type,
-        "source": source,
-        "sourceLang": source_lang,
-        "targetLang": target_lang,
-        "signLanguage": sign_language,
-        "timestamp": ts,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)),
-        "isPhrasebook": False,
-        "result": result,
+def _open_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+
+def _map_row(row: sqlite3.Row) -> dict:
+    r = dict(row)
+    sentiment = json.loads(r["sentiment_json"]) if r.get("sentiment_json") else None
+    metadata = json.loads(r["metadata_json"]) if r.get("metadata_json") else []
+    extra = json.loads(r["extra_json"]) if r.get("extra_json") else {}
+    try:
+        ts = int(time.mktime(time.strptime(r["created_at"], "%Y-%m-%dT%H:%M:%SZ")))
+    except Exception:
+        ts = int(time.time())
+    return {
+        "id": r["id"],
+        "entry_type": r["entry_type"],
+        "source": r["source_text"],
+        "sourceLang": r.get("source_lang"),
+        "targetLang": r.get("target_lang"),
+        "signLanguage": r.get("sign_language"),
+        "timestamp": ts * 1000,
+        "created_at": r["created_at"],
+        "isPhrasebook": bool(r["is_phrasebook"]),
+        "result": {
+            "translated_text": r.get("translated_text") or "",
+            "cultural_note": r.get("cultural_note") or "",
+            "formality_level": r.get("formality_level") or "neutral",
+            "regional_variant": r.get("regional_variant") or "",
+        },
         "sentiment": sentiment,
-        "metadata": metadata or [],
-        "wordSequence": word_sequence or [],
-        "extra": extra or {},
+        "metadata": metadata if isinstance(metadata, list) else [],
+        "wordSequence": extra.get("word_sequence", []) if isinstance(extra, dict) else [],
+        "extra": extra if isinstance(extra, dict) else {},
     }
-    _history_store[entry_id] = entry
-    # Keep at most 500 entries to avoid unbounded memory growth
-    while len(_history_store) > 500:
-        _history_store.popitem(last=False)
-    
-    _save_history_store()
-    return entry
 
 
-# ── Pydantic schemas ─────────────────────────────────────────────────────────
+def _db_create_entry(record: dict) -> dict:
+    entry_id = uuid.uuid4().hex
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    conn = _open_db()
+    try:
+        conn.execute(
+            """INSERT INTO history_entries (
+                id, entry_type, source_text, translated_text, source_lang, target_lang,
+                sign_language, cultural_note, formality_level, regional_variant,
+                sentiment_json, metadata_json, extra_json, is_phrasebook, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entry_id,
+                record["entry_type"],
+                record["source_text"],
+                record.get("translated_text"),
+                record.get("source_lang"),
+                record.get("target_lang"),
+                record.get("sign_language"),
+                record.get("cultural_note"),
+                record.get("formality_level"),
+                record.get("regional_variant"),
+                json.dumps(record["sentiment"]) if record.get("sentiment") else None,
+                json.dumps(record["metadata"]) if record.get("metadata") else None,
+                json.dumps(record["extra"]) if record.get("extra") else None,
+                1 if record.get("is_phrasebook") else 0,
+                created_at,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return _db_get_entry(entry_id)
 
-class TranslateRequest(BaseModel):
-    text: str
-    source_lang: str = "auto"
-    target_lang: str = "fr"
+
+def _db_get_entry(entry_id: str) -> dict:
+    conn = _open_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM history_entries WHERE id = ? LIMIT 1", (entry_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="History entry not found.")
+    return _map_row(row)
+
+
+# ── Cultural notes ─────────────────────────────────────────────────────────────
+_CULTURAL_NOTES: dict[str, dict] = {
+    "fr": {
+        "cultural_note": "In French, 'vous' is the safe default with strangers, professors, and authority figures. Use 'tu' only in clearly informal settings.",
+        "formality_level": "formal",
+        "regional_variant": "France French (Hexagonal)",
+        "formality_detail": "French social tone changes quickly with pronoun choice. In academic and administrative settings, leading with 'vous' avoids sounding overly familiar.",
+    },
+    "es": {
+        "cultural_note": "Spanish formality depends on region. 'Usted' is formal, 'tú' is informal, and some countries also use 'vos' in daily speech.",
+        "formality_level": "formal",
+        "regional_variant": "Latin American Spanish",
+        "formality_detail": "When you do not know the relationship boundary yet, 'usted' is the safer register in institutional contexts.",
+    },
+    "de": {
+        "cultural_note": "German uses 'Sie' for formal interactions and 'du' for informal ones. Professors and officials are generally addressed formally.",
+        "formality_level": "formal",
+        "regional_variant": "Standard German (Hochdeutsch)",
+        "formality_detail": "Switching from 'Sie' to 'du' is usually explicit. Starting formally is the safer move in public and academic environments.",
+    },
+    "ja": {
+        "cultural_note": "Japanese politeness is carried by sentence endings. The desu/masu register is the default safe option for public, academic, and service settings.",
+        "formality_level": "formal",
+        "regional_variant": "Standard Japanese (Hyōjungo)",
+        "formality_detail": "Even when the literal meaning is simple, choosing a polite ending changes how respectful the sentence sounds.",
+    },
+    "zh": {
+        "cultural_note": "Mandarin is less pronoun-formal than French or German, but titles and context matter. Using role titles such as 老师 conveys respect.",
+        "formality_level": "neutral",
+        "regional_variant": "Simplified Chinese (Mainland)",
+        "formality_detail": "Respect often comes from titles, phrasing, and indirectness rather than a separate formal pronoun system.",
+    },
+    "ar": {
+        "cultural_note": "Arabic varies heavily by region. Modern Standard Arabic is the formal written register, while everyday speech usually happens in a local dialect.",
+        "formality_level": "formal",
+        "regional_variant": "Modern Standard Arabic",
+        "formality_detail": "Formal communication and writing stay closer to MSA, especially in education, government, and cross-country contexts.",
+    },
+    "pt": {
+        "cultural_note": "Portuguese differs significantly between Brazil and Portugal in pronunciation, vocabulary, and tone. Brazil tends to sound more informal in everyday speech.",
+        "formality_level": "neutral",
+        "regional_variant": "Brazilian Portuguese",
+        "formality_detail": "In Brazilian Portuguese, 'você' is standard in daily use. In more formal contexts, titles and indirect phrasing do more work.",
+    },
+    "ko": {
+        "cultural_note": "Korean encodes respect through speech levels and honorific markers. Formal polite endings are safest in professional or academic settings.",
+        "formality_level": "formal",
+        "regional_variant": "Standard Korean (Seoul dialect)",
+        "formality_detail": "You are often expected to match the listener's status and age with your sentence ending, not just the vocabulary.",
+    },
+    "it": {
+        "cultural_note": "Italian uses 'Lei' formally and 'tu' informally. Formal address remains common in administration, health care, and university settings.",
+        "formality_level": "formal",
+        "regional_variant": "Standard Italian",
+        "formality_detail": "Starting with 'Lei' is safer when you do not know the relationship, then relaxing only when invited.",
+    },
+    "en": {
+        "cultural_note": "English formality is driven more by tone and wording than pronouns. Directness is often acceptable, but phrasing still shifts by setting.",
+        "formality_level": "neutral",
+        "regional_variant": "International English",
+        "formality_detail": "Politeness in English often comes from modal verbs and softeners such as 'could', 'would', and 'please'.",
+    },
+}
+
+# ── Language detector ─────────────────────────────────────────────────────────
+_LANG_KEYWORDS: dict[str, list[str]] = {
+    "fr": ["bonjour", "merci", "comment", "vous", "allez", "oui", "excusez"],
+    "es": ["hola", "gracias", "usted", "como", "estas", "por", "favor"],
+    "de": ["hallo", "danke", "bitte", "wie", "geht", "ihnen", "sie"],
+    "it": ["ciao", "grazie", "come", "stai", "lei", "buongiorno"],
+    "pt": ["ola", "obrigado", "voce", "como", "esta", "bom", "dia"],
+    "en": ["hello", "thank", "you", "how", "are", "please"],
+}
+
+
+def _detect_language(text: str) -> str:
+    if re.search(r"[؀-ۿ]", text):
+        return "ar"
+    if re.search(r"[가-힣]", text):
+        return "ko"
+    if re.search(r"[぀-ヿ]", text):
+        return "ja"
+    if re.search(r"[一-鿿]", text):
+        return "zh"
+    normalized = text.lower()
+    scores = {
+        lang: sum(1 for kw in kws if kw in normalized)
+        for lang, kws in _LANG_KEYWORDS.items()
+    }
+    best = max(scores, key=lambda k: scores[k])
+    return best if scores[best] > 0 else "en"
+
+
+# ── Translation service ───────────────────────────────────────────────────────
+_OFFLINE_PHRASEBOOK: dict[str, dict[str, str]] = {
+    "hello, how are you?": {
+        "fr": "Bonjour, comment allez-vous ?",
+        "es": "Hola, ¿cómo está usted?",
+        "de": "Hallo, wie geht es Ihnen?",
+        "it": "Buongiorno, come sta?",
+        "pt": "Olá, como você está?",
+        "ja": "こんにちは、お元気ですか？",
+        "zh": "你好，你好吗？",
+        "ar": "مرحبًا، كيف حالك؟",
+        "ko": "안녕하세요, 잘 지내세요?",
+    },
+    "thank you": {
+        "fr": "Merci", "es": "Gracias", "de": "Danke", "it": "Grazie",
+        "pt": "Obrigado", "ja": "ありがとうございます", "zh": "谢谢",
+        "ar": "شكرًا", "ko": "감사합니다",
+    },
+    "please": {
+        "fr": "S'il vous plaît", "es": "Por favor", "de": "Bitte",
+        "it": "Per favore", "pt": "Por favor", "ja": "お願いします",
+        "zh": "请", "ar": "من فضلك", "ko": "부탁합니다",
+    },
+    "where is the library?": {
+        "fr": "Où est la bibliothèque ?", "es": "¿Dónde está la biblioteca?",
+        "de": "Wo ist die Bibliothek?", "it": "Dov'è la biblioteca?",
+        "pt": "Onde fica a biblioteca?", "ja": "図書館はどこですか？",
+        "zh": "图书馆在哪里？", "ar": "أين تقع المكتبة؟", "ko": "도서관이 어디에 있나요?",
+    },
+    "i don't understand.": {
+        "fr": "Je ne comprends pas.", "es": "No entiendo.",
+        "de": "Ich verstehe nicht.", "it": "Non capisco.",
+        "pt": "Não entendo.", "ja": "わかりません。",
+        "zh": "我不明白。", "ar": "أنا لا أفهم.", "ko": "이해하지 못했습니다.",
+    },
+}
+
+
+def _call_libretranslate(text: str, source: str, target: str) -> str | None:
+    url = os.environ.get("LIBRETRANSLATE_URL", "").strip()
+    if not url:
+        return None
+    payload: dict[str, Any] = {"q": text, "source": source, "target": target, "format": "text"}
+    api_key = os.environ.get("LIBRETRANSLATE_API_KEY", "").strip()
+    if api_key:
+        payload["api_key"] = api_key
+    try:
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            url, data=data,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.load(resp)
+        return result.get("translatedText") or None
+    except Exception:
+        return None
+
+
+def _call_mymemory(text: str, source: str, target: str) -> str | None:
+    base = os.environ.get("MYMEMORY_URL", "https://api.mymemory.translated.net/get").strip()
+    query = urllib.parse.urlencode({"q": text, "langpair": f"{source}|{target}"})
+    try:
+        with urllib.request.urlopen(f"{base}?{query}", timeout=5) as resp:
+            result = json.load(resp)
+        return result.get("responseData", {}).get("translatedText") or None
+    except Exception:
+        return None
+
+
+def _do_translate(text: str, source: str, target: str) -> str:
+    provider = os.environ.get("TRANSLATION_PROVIDER", "fallback").lower()
+    translated: str | None = None
+    if provider == "libretranslate":
+        translated = _call_libretranslate(text, source, target)
+    elif provider == "mymemory":
+        translated = _call_mymemory(text, source, target)
+    if not translated or not translated.strip():
+        translated = _OFFLINE_PHRASEBOOK.get(text.lower().strip(), {}).get(target, text)
+    return translated
+
+
+# ── Text-to-sign service ──────────────────────────────────────────────────────
+_TIME_WORDS = {"today", "tomorrow", "yesterday", "now", "soon", "later", "morning", "night"}
+_SUBJECT_WORDS = {"i", "you", "we", "they", "he", "she", "my", "your", "our", "their"}
+_ACTION_WORDS = {
+    "go", "need", "help", "learn", "meet", "repeat", "understand",
+    "translate", "sign", "study", "arrive", "speak", "thank", "please",
+}
+_STOP_WORDS = {"a", "an", "the", "is", "are", "am", "to", "of", "for", "on", "at", "in"}
+_KNOWN_SIGNS = {
+    "HELLO", "THANK", "YOU", "PLEASE", "GO", "LEARN", "MEET",
+    "HELP", "UNDERSTAND", "REPEAT", "LIBRARY", "NAME", "NICE",
+}
+_TAG_RANK = {"TIME": 0, "SUBJECT": 1, "OBJECT": 2, "ACTION": 3, "MODIFIER": 4}
+
+
+def _duration_for(word: str, tag: str) -> int:
+    base = {"TIME": 900, "SUBJECT": 950, "ACTION": 1250, "MODIFIER": 800}.get(tag, 1050)
+    return base + min(len(word), 10) * 35
+
+
+def _sign_sentiment(tokens: list[str]) -> dict:
+    positive = {"good", "great", "love", "thanks", "thank", "hello", "nice", "happy"}
+    negative = {"bad", "sorry", "lost", "confused", "late", "wrong", "problem"}
+    pos = sum(1 for t in tokens if t in positive)
+    neg = sum(1 for t in tokens if t in negative)
+    total = max(len(tokens), 1)
+    return {
+        "polarity": round((pos - neg) / total, 2),
+        "subjectivity": round(min(1.0, (pos + neg + 1) / total), 2),
+    }
+
+
+def _text_to_sign_convert(text: str, sign_language: str = "ASL") -> dict:
+    tokens = re.findall(r"[\w']+", text.lower())
+    metadata: list[dict] = []
+    seen: set[str] = set()
+    for token in tokens:
+        if token in _STOP_WORDS:
+            continue
+        word = token.upper()
+        if word in seen:
+            continue
+        seen.add(word)
+        if token in _TIME_WORDS:
+            tag = "TIME"
+        elif token in _SUBJECT_WORDS:
+            tag = "SUBJECT"
+        elif token in _ACTION_WORDS or token.endswith("ing") or token.endswith("ed"):
+            tag = "ACTION"
+        elif len(token) <= 3:
+            tag = "MODIFIER"
+        else:
+            tag = "OBJECT"
+        metadata.append({"word": word, "tag": tag, "duration_ms": _duration_for(word, tag)})
+    if not metadata:
+        word = text.upper().strip()
+        metadata.append({"word": word, "tag": "OBJECT", "duration_ms": _duration_for(word, "OBJECT")})
+    metadata.sort(key=lambda x: _TAG_RANK.get(x["tag"], 99))
+    word_sequence = [m["word"] for m in metadata]
+    return {
+        "sign_language": sign_language.upper(),
+        "word_sequence": word_sequence,
+        "fingerspell_fallback": [w for w in word_sequence if w not in _KNOWN_SIGNS or len(w) > 7],
+        "animation_clips": [
+            {
+                "word": m["word"],
+                "clip_url": f"/clips/asl/{m['word'].lower()}.glb",
+                "fingerspell": len(m["word"]) > 7,
+                "duration_ms": m["duration_ms"],
+                "tag": m["tag"],
+            }
+            for m in metadata
+        ],
+        "sentiment": _sign_sentiment(tokens),
+        "syntactic_metadata": metadata,
+    }
+
+
+# ── Mock fallback signs ───────────────────────────────────────────────────────
+_MOCK_SIGNS = [
+    "HELLO", "THANK YOU", "WHERE", "HELP", "MY NAME IS",
+    "I DON'T UNDERSTAND", "PLEASE REPEAT", "NICE TO MEET YOU",
+]
+
+# ── Pydantic schemas ──────────────────────────────────────────────────────────
 
 
 class LandmarkRequest(BaseModel):
-    """Base64-encoded JPEG/PNG frame from the webcam."""
     frame_b64: str
     width: int
     height: int
 
 
 class LandmarkResponse(BaseModel):
-    # Holistic output — separate arrays so classify can use all three
-    right_hand: list[dict]   # 21 landmarks {x,y,z} or []
-    left_hand:  list[dict]   # 21 landmarks {x,y,z} or []
-    pose:       list[dict]   # 33 landmarks {x,y,z} or []
-    face:       list[dict]   # 468 landmarks {x,y,z} or []
+    right_hand: list[dict]
+    left_hand: list[dict]
+    pose: list[dict]
+    face: list[dict]
     hand_detected: bool
     confidence: float
 
 
 class ClassifyRequest(BaseModel):
-    # New holistic format (preferred)
-    right_hand: list[dict] = []   # 21 landmarks {x,y,z}
-    left_hand:  list[dict] = []   # 21 landmarks {x,y,z}
-    pose:       list[dict] = []   # 33 pose landmarks for normalization
-    face:       list[dict] = []   # 468+ face landmarks
-    # Legacy flat format (still accepted for backwards compatibility)
-    landmarks:  list[dict] = []   # old: flat 21-landmark list
+    right_hand: list[dict] = []
+    left_hand: list[dict] = []
+    pose: list[dict] = []
+    face: list[dict] = []
+    landmarks: list[dict] = []
+    sign_language: str = "ASL"
 
 
 class ClassifyResponse(BaseModel):
     predicted_sign: str
     confidence: float
-    alternatives: list[dict]  # [{"sign": "...", "confidence": 0.x}]
-
-
-class TextToSignRequest(BaseModel):
-    text: str
-    sign_language: str = "ASL"
+    alternatives: list[dict]
 
 
 class SaveRecognitionRequest(BaseModel):
@@ -223,191 +543,48 @@ class SaveRecognitionRequest(BaseModel):
     sign_language: str = "ASL"
 
 
-# ── Mock data ─────────────────────────────────────────────────────────────────
+class TrainRequest(BaseModel):
+    samples_per_sign: int = 150
+    n_folds: int = 5
+    kmeans_clusters: int = 20
+    data_source: str | None = None
 
-_CULTURAL_NOTES: dict[str, dict] = {
-    "fr": {
-        "cultural_note": (
-            "In French, 'vous' is the polite/formal second-person pronoun used with strangers, "
-            "professors, and authority figures. Use 'tu' only with close friends or peers who "
-            "have explicitly invited it. Getting this wrong can seem rude or overly familiar."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "France French (Hexagonal)",
-    },
-    "es": {
-        "cultural_note": (
-            "Spanish has two words for 'you': 'usted' (formal) and 'tú' (informal). "
-            "In Latin America, 'ustedes' covers both formal and informal plural. "
-            "In Spain, 'vosotros' is informal plural. Formality expectations differ by country — "
-            "Argentina uses 'vos' instead of 'tú'."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Latin American Spanish",
-    },
-    "ja": {
-        "cultural_note": (
-            "Japanese embeds formality into verb endings. 'Desu/masu' forms are polite and safe "
-            "for exchange students in all academic settings. 'Keigo' (honorific speech) has three "
-            "levels — teineigo (polite), sonkeigo (respectful), and kenjōgo (humble). "
-            "Mastering teineigo covers most daily interactions."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Standard Japanese (Hyōjungo)",
-    },
-    "de": {
-        "cultural_note": (
-            "German uses 'Sie' (capitalized, formal) and 'du' (informal). In German universities, "
-            "it is standard to address professors as 'Herr/Frau [Last Name]'. Switching to 'du' "
-            "is always the other person's invitation to make — never assume it."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Standard German (Hochdeutsch)",
-    },
-    "zh": {
-        "cultural_note": (
-            "Mandarin Chinese is less pronoun-formal than European languages but highly "
-            "context-sensitive. Titles are important: address professors as 'Lǎoshī' (老师). "
-            "Refusing food or gifts at first offering is polite — hosts expect you to accept "
-            "on the second or third offer."
-        ),
-        "formality_level": "neutral",
-        "regional_variant": "Simplified Chinese (Mainland)",
-    },
-    "ar": {
-        "cultural_note": (
-            "Arabic has significant diglossia: Modern Standard Arabic (MSA) is used in education "
-            "and formal writing, while each region has a spoken dialect. In academic contexts, "
-            "MSA is expected in writing. Greetings often include religious expressions "
-            "('As-salamu alaykum') — it's respectful to use them."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Modern Standard Arabic (MSA)",
-    },
-    "ko": {
-        "cultural_note": (
-            "Korean has a formal speech level system called 'Gyeongeo'. The '-시-' honorific "
-            "infix elevates the subject. Use the formal polite ending '-습니다/ㅂ니다' in academic "
-            "or professional contexts. Addressing seniors by their role title is common."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Standard Korean (Seoul dialect)",
-    },
-    "it": {
-        "cultural_note": (
-            "Italian uses 'Lei' (formal) and 'tu' (informal). In academic settings, use 'Lei' "
-            "with professors. Italy has strong regional dialects — what you learn as 'standard "
-            "Italian' is based on Florentine-Tuscan, though Rome and Milan accents dominate media."
-        ),
-        "formality_level": "formal",
-        "regional_variant": "Standard Italian",
-    },
-    "pt": {
-        "cultural_note": (
-            "Portuguese from Brazil (PT-BR) and Portugal (PT-PT) differ notably in pronunciation, "
-            "vocabulary, and formality. Brazilian Portuguese is generally more informal in daily "
-            "speech. The word 'você' (you) is standard in Brazil; in Portugal, 'o senhor/a senhora' "
-            "is used formally."
-        ),
-        "formality_level": "neutral",
-        "regional_variant": "Brazilian Portuguese (PT-BR)",
-    },
-    "en": {
-        "cultural_note": (
-            "English is widely used as a lingua franca in international academic settings. "
-            "British, American, and Australian English have subtle vocabulary differences "
-            "(e.g. 'lift' vs 'elevator', 'maths' vs 'math'). Tone and context matter more "
-            "than strict pronoun formality."
-        ),
-        "formality_level": "neutral",
-        "regional_variant": "International English",
-    },
-}
 
-# No mock translations! We will use deep-translator.
+class TranslateRequest(BaseModel):
+    text: str
+    source_lang: str = "auto"
+    target_lang: str = "fr"
 
-_MOCK_SIGNS = [
-    "HELLO",
-    "THANK YOU",
-    "WHERE",
-    "HELP",
-    "MY NAME IS",
-    "I DON'T UNDERSTAND",
-    "PLEASE REPEAT",
-    "NICE TO MEET YOU",
-]
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+class TextToSignRequest(BaseModel):
+    text: str
+    sign_language: str = "ASL"
+
+
+class PhrasebookSaveRequest(BaseModel):
+    history_id: str
+
+
+class PhrasebookUpdateRequest(BaseModel):
+    extra: dict = {}
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/health", tags=["System"])
 def health_check():
-    """Returns service health and timestamp."""
     return {
         "status": "ok",
-        "service": "TRADUMUST API",
-        "version": "0.1.0",
+        "service": "SignBridge API",
+        "version": "2.0.0",
         "timestamp": int(time.time()),
-        "mode": "MVP (mock data — swap in real APIs for production)",
+        "mode": "python/sqlite",
     }
-
-
-@app.post("/api/translate", tags=["Translation"])
-def translate_text(req: TranslateRequest):
-    """
-    Translate text and return cultural context + a persisted history entry.
-
-    PRODUCTION SWAP:
-        Replace the mock lookup below with a call to LibreTranslate:
-            import httpx
-            resp = httpx.post("http://localhost:5000/translate", json={
-                "q": req.text, "source": req.source_lang, "target": req.target_lang
-            })
-        Or Google Cloud Translation API:
-            from google.cloud import translate_v2
-            client = translate_v2.Client()
-            result = client.translate(req.text, target_language=req.target_lang)
-    """
-    if not req.text.strip():
-        raise HTTPException(status_code=422, detail="text field must not be empty")
-
-    detected_source = req.source_lang if req.source_lang != "auto" else "auto"
-    target = req.target_lang
-
-    try:
-        translated = GoogleTranslator(source=detected_source, target=target).translate(req.text)
-    except Exception:
-        # Fallback if connection fails
-        translated = req.text
-
-    # Cultural note for target language
-    note_data = _CULTURAL_NOTES.get(target, _CULTURAL_NOTES["en"])
-
-    result = {
-        "translated_text": translated,
-        "cultural_note": note_data["cultural_note"],
-        "formality_level": note_data["formality_level"],
-        "regional_variant": note_data["regional_variant"],
-        "source_lang_detected": detected_source,
-        "formality_detail": None,
-    }
-
-    entry = _make_entry(
-        entry_type="translation",
-        source=req.text,
-        source_lang=detected_source,
-        target_lang=target,
-        sign_language=None,
-        result=result,
-    )
-
-    return {**result, "history_entry": entry}
 
 
 @app.post("/api/sign/extract-landmarks", response_model=LandmarkResponse, tags=["Sign Language"])
 def extract_landmarks(req: LandmarkRequest):
-    """
-    Extract hand, body-pose, and face landmarks from a base64-encoded image frame.
-    """
+    """Extract hand, body-pose, and face landmarks from a base64-encoded image frame."""
     try:
         base64.b64decode(req.frame_b64, validate=True)
     except Exception:
@@ -418,30 +595,29 @@ def extract_landmarks(req: LandmarkRequest):
     if mp_holistic is not None:
         import cv2
         img_bytes = base64.b64decode(req.frame_b64)
-        nparr     = np.frombuffer(img_bytes, np.uint8)
-        frame     = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if frame is None:
             raise HTTPException(status_code=422, detail="Could not decode image from frame_b64")
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         def _lms(landmark_list):
-            if not landmark_list: return []
+            if not landmark_list:
+                return []
             return [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in landmark_list.landmark]
 
         with mp_holistic.Holistic(static_image_mode=True, model_complexity=1) as holistic:
             results = holistic.process(frame_rgb)
 
-        rh   = _lms(results.right_hand_landmarks)
-        lh   = _lms(results.left_hand_landmarks)
+        rh = _lms(results.right_hand_landmarks)
+        lh = _lms(results.left_hand_landmarks)
         pose = _lms(results.pose_landmarks)
         face = _lms(results.face_landmarks)
-
         hand_detected = bool(rh or lh)
-        confidence    = 0.95 if hand_detected else 0.0
 
         return LandmarkResponse(
             right_hand=rh, left_hand=lh, pose=pose, face=face,
-            hand_detected=hand_detected, confidence=confidence,
+            hand_detected=hand_detected, confidence=0.95 if hand_detected else 0.0,
         )
 
     return LandmarkResponse(
@@ -452,50 +628,42 @@ def extract_landmarks(req: LandmarkRequest):
 
 @app.post("/api/sign/classify", response_model=ClassifyResponse, tags=["Sign Language"])
 def classify_sign(req: ClassifyRequest):
-    """
-    Classify a sign gesture using either the Classic Sklearn model or the new LSTM PyTorch model.
-    """
-    global _ml_model, _ml_classes
-    
-    # In a real scenario, we might receive a sequence of frames. 
-    # For this endpoint, we'll handle the single-frame classification using the best available model.
-    
-    predicted   = None
-    confidence  = 0.0
-    alternatives = []
+    """Classify a sign gesture using the trained ML model."""
+    lang = (req.sign_language or "ASL").upper()
+    ml_model, ml_classes = _get_ml_model(lang)
 
-    # Check if we have an LSTM model (requires sequences, but we can mock a sequence of 1 for now)
-    # or use the classic model on a single frame.
-    
-    if _ml_model is not None and _ml_classes is not None:
+    predicted = None
+    confidence = 0.0
+    alternatives: list[dict] = []
+
+    if ml_model is not None and ml_classes is not None:
         features = extract_holistic_features(
             right_hand=req.right_hand or None,
-            left_hand=req.left_hand  or None,
-            pose=req.pose            or None,
-            face=req.face            or None,
+            left_hand=req.left_hand or None,
+            pose=req.pose or None,
+            face=req.face or None,
         ).reshape(1, -1)
 
         try:
-            # For now, we still use the classic model for the single-frame endpoint
-            # but it now uses the 186-dim feature vector.
-            predicted_idx = int(_ml_model.predict(features)[0])
-            predicted     = _ml_classes[predicted_idx]
-            probas        = _ml_model.predict_proba(features)[0]
-            top_indices   = np.argsort(probas)[::-1]
-            confidence    = float(probas[predicted_idx])
-            alternatives  = [
-                {"sign": _ml_classes[i], "confidence": round(float(probas[i]), 4)}
+            predicted_idx = int(ml_model.predict(features)[0])
+            predicted = ml_classes[predicted_idx]
+            probas = ml_model.predict_proba(features)[0]
+            top_indices = np.argsort(probas)[::-1]
+            confidence = float(probas[predicted_idx])
+            alternatives = [
+                {"sign": ml_classes[i], "confidence": round(float(probas[i]), 4)}
                 for i in top_indices[1:4]
             ]
         except Exception:
             predicted = None
 
+    mock_pool = ml_classes if ml_classes else _MOCK_SIGNS
     if predicted is None:
-        predicted   = random.choice(_MOCK_SIGNS)
-        confidence  = round(random.uniform(0.72, 0.98), 2)
+        predicted = random.choice(mock_pool)
+        confidence = round(random.uniform(0.72, 0.98), 2)
         alternatives = [
             {"sign": s, "confidence": round(random.uniform(0.05, 0.30), 2)}
-            for s in random.sample([s for s in _MOCK_SIGNS if s != predicted], k=3)
+            for s in random.sample([s for s in mock_pool if s != predicted], k=min(3, len(mock_pool) - 1))
         ]
 
     return ClassifyResponse(
@@ -505,38 +673,24 @@ def classify_sign(req: ClassifyRequest):
     )
 
 
-# ── ML training endpoints ─────────────────────────────────────────────────────
-
-class TrainRequest(BaseModel):
-    samples_per_sign: int = 150
-    n_folds: int = 5
-    kmeans_clusters: int = 20
-
-
 @app.post("/api/ml/train", tags=["ML"])
 def train_model(req: TrainRequest):
-    """
-    Train (or retrain) the sign classification model.
-
-    Runs the full pipeline:
-      1. Generate synthetic dataset from signs_data.json
-      2. Train KNN, RandomForest, SVM with 5-fold cross-validation
-      3. Run K-Means + PCA unsupervised analysis
-      4. Save the best model to trained_model.pkl
-      5. Save the full metrics report to training_report.json
-
-    Returns the full training report (accuracy, CV scores, cluster metrics, etc.)
-    """
-    global _ml_model, _ml_classes
+    """Train (or retrain) the sign classification model."""
     try:
         report = run_training(
+            data_source=req.data_source,
             samples_per_sign=req.samples_per_sign,
             n_folds=req.n_folds,
             kmeans_clusters=req.kmeans_clusters,
             verbose=False,
         )
-        # Reload the freshly trained model into memory
-        _ml_model, _ml_classes = load_trained_model()
+        lang = (req.data_source or "ASL").upper()
+        if lang == "TSL":
+            _ml_models.pop("TSL", None)
+            _get_ml_model("TSL")
+        else:
+            _ml_models.pop("ASL", None)
+            _get_ml_model("ASL")
         return {"status": "ok", "report": report}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Training failed: {e}")
@@ -544,17 +698,7 @@ def train_model(req: TrainRequest):
 
 @app.get("/api/ml/report", tags=["ML"])
 def get_ml_report():
-    """
-    Return the most recent training report (training_report.json).
-
-    Includes:
-      - Dataset statistics (samples, classes, features)
-      - Per-model cross-validation scores (accuracy, F1, overfit gap)
-      - Best model name and test accuracy
-      - K-Means cluster evaluation (ARI, NMI, purity)
-      - PCA explained variance
-      - Learning curve data
-    """
+    """Return the most recent training report."""
     from backend.ml.train import REPORT_PATH
     if not REPORT_PATH.exists():
         raise HTTPException(
@@ -566,214 +710,220 @@ def get_ml_report():
     return report
 
 
-@app.post("/api/text-to-sign", tags=["Sign Language"])
-def text_to_sign(req: TextToSignRequest):
-    """
-    Convert text to a sequence of ASL sign animation triggers.
+@app.post("/api/ml/youtube-learn", tags=["ML"])
+async def youtube_learn(req: dict):
+    """Kick off self-supervised learning from a YouTube ASL video."""
+    from concurrent.futures import ThreadPoolExecutor
+    from backend.ml.youtube_learner import learn_from_url
 
-    Returns word-level sign gloss, fingerspelling flags, and a persisted history entry.
+    url = req.get("url", "")
+    if not url:
+        raise HTTPException(status_code=422, detail="url is required")
 
-    PRODUCTION SWAP:
-        Use a sign language lexicon / gloss dictionary to map English words to ASL glosses.
-        Words without a direct sign should fall back to fingerspelling.
-        animation_clips should point to real GLB file URLs served from your CDN/storage.
-    """
-    if not req.text.strip():
-        raise HTTPException(status_code=422, detail="text field must not be empty")
-
-    blob = TextBlob(req.text)
-
-    # 1. Sentiment Analysis
-    sentiment = {
-        "polarity": round(blob.sentiment.polarity, 2),
-        "subjectivity": round(blob.sentiment.subjectivity, 2)
-    }
-
-    # 2. Advanced ASL Glossing Logic
-    # ASL Structure Target: TIME + SUBJECT + OBJECT + VERB
-    # We use POS tags: NN (Noun), VB (Verb), JJ (Adj), RB (Adv), PRP (Pronoun), etc.
-
-    tags = blob.tags
-    time_words: list[dict] = []
-    subjects:   list[dict] = []
-    objects:    list[dict] = []
-    verbs:      list[dict] = []
-    others:     list[dict] = []
-
-    time_keywords = {"tomorrow", "yesterday", "today", "now", "soon", "later", "morning", "night"}
-
-    for word, tag in tags:
-        w_lower = word.lower()
-        # Lemmatize all words to their root form (e.g., "going" -> "go")
-        lemma = Word(w_lower).lemmatize("v") if "VB" in tag else Word(w_lower).lemmatize()
-        upper_lemma = lemma.upper()
-
-        if w_lower in time_keywords or tag == "RB":
-            time_words.append({"word": upper_lemma, "tag": "TIME"})
-        elif tag in ["PRP", "NNP"] or (tag == "NN" and not subjects):
-            subjects.append({"word": upper_lemma, "tag": "SUBJECT"})
-        elif tag in ["NN", "NNS"]:
-            objects.append({"word": upper_lemma, "tag": "OBJECT"})
-        elif "VB" in tag:
-            verbs.append({"word": upper_lemma, "tag": "ACTION"})
-        else:
-            if upper_lemma not in ["A", "AN", "THE", "AM", "IS", "ARE", "BE"]:
-                others.append({"word": upper_lemma, "tag": "MODIFIER"})
-
-    # Reconstruct in ASL logic order
-    ordered_metadata = time_words + subjects + objects + verbs + others
-
-    # Filter uniques while preserving order
-    unique_meta: list[dict] = []
-    seen: set[str] = set()
-    for item in ordered_metadata:
-        if item["word"] not in seen:
-            unique_meta.append(item)
-            seen.add(item["word"])
-
-    word_sequence = [item["word"] for item in unique_meta]
-    fingerspell_fallback = [w for w in word_sequence if len(w) > 7]
-
-    animation_clips = [
-        {
-            "word": item["word"],
-            "clip_url": f"/clips/asl/{item['word'].lower()}.glb",
-            "fingerspell": len(item["word"]) > 7,
-            "duration_ms": 700 + len(item["word"]) * 50,
-            "tag": item["tag"]
-        }
-        for item in unique_meta
-    ]
-
-    entry = _make_entry(
-        entry_type="sign_expression",
-        source=req.text,
-        source_lang=None,
-        target_lang=None,
-        sign_language=req.sign_language,
-        result={
-            "translated_text": " ".join(word_sequence),
-            "cultural_note": "",
-            "formality_level": "neutral",
-            "regional_variant": "",
-        },
-        sentiment=sentiment,
-        metadata=unique_meta,
-        word_sequence=word_sequence,
-        extra={"word_sequence": word_sequence},
+    loop = asyncio.get_event_loop()
+    executor = ThreadPoolExecutor(max_workers=1)
+    stats = await loop.run_in_executor(
+        executor,
+        lambda: learn_from_url(
+            url,
+            dry_run=req.get("dry_run", False),
+            lr=float(req.get("lr", 1e-4)),
+            min_frames=int(req.get("min_frames", 8)),
+        ),
     )
-
-    return {
-        "sign_language": req.sign_language,
-        "word_sequence": word_sequence,
-        "fingerspell_fallback": fingerspell_fallback,
-        "animation_clips": animation_clips,
-        "sentiment": sentiment,
-        "syntactic_metadata": unique_meta,
-        "history_entry": entry,
-    }
+    return stats
 
 
 @app.post("/api/sign/save-recognition", tags=["Sign Language"])
 def save_recognition(req: SaveRecognitionRequest):
-    """
-    Persist a recognized sign sequence into history.
-    This allows recognized phrases to be added to the phrasebook.
-    """
+    """Persist a recognized sign sequence into history."""
     if not req.text.strip():
         raise HTTPException(status_code=422, detail="text field must not be empty")
 
     words = req.text.upper().replace(",", "").replace(".", "").replace("?", "").split()
+    metadata = [{"word": w, "tag": "RECOGNIZED"} for w in words]
 
-    # Simple mock metadata for recognition entries
-    unique_meta = [{"word": w, "tag": "RECOGNIZED"} for w in words]
-
-    entry = _make_entry(
-        entry_type="sign_expression",  # Use sign_expression to be compatible with signs tab
-        source=req.text,
-        source_lang=None,
-        target_lang=None,
-        sign_language=req.sign_language,
-        result={
-            "translated_text": req.text,
-            "cultural_note": "Persisted from AI Sign Recognition.",
-            "formality_level": "neutral",
-            "regional_variant": "",
-        },
-        sentiment={"polarity": 0.0, "subjectivity": 0.0},
-        metadata=unique_meta,
-        word_sequence=words,
-        extra={"word_sequence": words},
-    )
-
+    entry = _db_create_entry({
+        "entry_type": "sign_expression",
+        "source_text": req.text,
+        "translated_text": req.text,
+        "sign_language": req.sign_language,
+        "sentiment": {"polarity": 0.0, "subjectivity": 0.0},
+        "metadata": metadata,
+        "extra": {"word_sequence": words},
+    })
     return {"status": "saved", "history_id": entry["id"], "history_entry": entry}
+
+
+@app.get("/api/history", tags=["History"])
+def get_history(entry_type: str | None = None, limit: int = 10):
+    """Return history entries, newest first."""
+    limit = max(1, min(limit, 100))
+    conn = _open_db()
+    try:
+        if entry_type:
+            rows = conn.execute(
+                "SELECT * FROM history_entries WHERE entry_type = ? ORDER BY created_at DESC LIMIT ?",
+                (entry_type, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM history_entries ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    finally:
+        conn.close()
+    return {"data": [_map_row(r) for r in rows]}
+
+
+@app.post("/api/translate", tags=["Translation"])
+def translate(req: TranslateRequest):
+    """Translate text and persist the result to history."""
+    text = re.sub(r"\s+", " ", req.text).strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="The text field must not be empty.")
+
+    target = req.target_lang.lower().strip()
+    if not target or target == "auto":
+        raise HTTPException(status_code=422, detail="A concrete target language is required.")
+
+    source = req.source_lang.lower().strip()
+    detected_source = _detect_language(text) if (not source or source == "auto") else source
+
+    translated = text if detected_source == target else _do_translate(text, detected_source, target)
+
+    note = _CULTURAL_NOTES.get(target, _CULTURAL_NOTES["en"])
+
+    entry = _db_create_entry({
+        "entry_type": "translation",
+        "source_text": text,
+        "translated_text": translated,
+        "source_lang": detected_source,
+        "target_lang": target,
+        "cultural_note": note["cultural_note"],
+        "formality_level": note["formality_level"],
+        "regional_variant": note["regional_variant"],
+    })
+
+    return {
+        "translated_text": translated,
+        "cultural_note": note["cultural_note"],
+        "formality_level": note["formality_level"],
+        "regional_variant": note["regional_variant"],
+        "formality_detail": note["formality_detail"],
+        "source_lang_detected": detected_source,
+        "history_entry": entry,
+    }
+
+
+@app.post("/api/text-to-sign", tags=["Sign Language"])
+def text_to_sign(req: TextToSignRequest):
+    """Convert text to sign language metadata and persist to history."""
+    text = re.sub(r"\s+", " ", req.text).strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="The text field must not be empty.")
+
+    sign_data = _text_to_sign_convert(text, req.sign_language)
+
+    entry = _db_create_entry({
+        "entry_type": "sign_expression",
+        "source_text": text,
+        "translated_text": " ".join(sign_data["word_sequence"]),
+        "sign_language": sign_data["sign_language"],
+        "sentiment": sign_data["sentiment"],
+        "metadata": sign_data["syntactic_metadata"],
+        "extra": {"word_sequence": sign_data["word_sequence"]},
+    })
+
+    return {**sign_data, "history_entry": entry}
+
+
+@app.get("/api/phrasebook", tags=["Phrasebook"])
+def get_phrasebook(limit: int = 100):
+    """List phrasebook entries."""
+    limit = max(1, min(limit, 200))
+    conn = _open_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM history_entries WHERE is_phrasebook = 1 ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {"data": [_map_row(r) for r in rows]}
+
+
+@app.post("/api/phrasebook", tags=["Phrasebook"])
+def save_phrasebook(req: PhrasebookSaveRequest):
+    """Mark a translation history entry as a phrasebook entry."""
+    history_id = req.history_id.strip()
+    if not history_id:
+        raise HTTPException(status_code=422, detail="A history_id is required to save a phrase.")
+
+    conn = _open_db()
+    try:
+        result = conn.execute(
+            "UPDATE history_entries SET is_phrasebook = 1 WHERE id = ? AND entry_type = 'translation'",
+            (history_id,),
+        )
+        conn.commit()
+        updated = result.rowcount
+    finally:
+        conn.close()
+
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Translation history entry not found.")
+
+    return {"entry": _db_get_entry(history_id)}
+
+
+@app.delete("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
+def delete_phrasebook(entry_id: str):
+    """Remove an entry from the phrasebook."""
+    conn = _open_db()
+    try:
+        result = conn.execute(
+            "UPDATE history_entries SET is_phrasebook = 0 WHERE id = ?",
+            (entry_id,),
+        )
+        conn.commit()
+        updated = result.rowcount
+    finally:
+        conn.close()
+
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Phrasebook entry not found.")
+
+    return {"deleted": True}
+
+
+@app.patch("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
+def update_phrasebook(entry_id: str, req: PhrasebookUpdateRequest):
+    """Update the extra JSON field of a phrasebook entry."""
+    conn = _open_db()
+    try:
+        conn.execute(
+            "UPDATE history_entries SET extra_json = ? WHERE id = ?",
+            (json.dumps(req.extra), entry_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"entry": _db_get_entry(entry_id)}
 
 
 @app.get("/api/cultural-notes/{lang}", tags=["Translation"])
 def get_cultural_notes(lang: str):
-    """
-    Returns comprehensive cultural and linguistic educational content for a target language.
-    Used to populate the sidebar educational panel and collapsible 'Why this translation works' section.
-    """
-    lang = lang.lower()
-    note_data = _CULTURAL_NOTES.get(lang)
-    if not note_data:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No cultural notes found for language code '{lang}'. "
-                   f"Available: {list(_CULTURAL_NOTES.keys())}",
-        )
-
-    # Extended educational content keyed by language
-    extended: dict[str, dict] = {
-        "fr": {
-            "quick_tips": [
-                "Always say 'Bonjour' when entering a shop — it's expected politeness.",
-                "Avoid asking 'How much do you earn?' — considered very personal in France.",
-                "La bise (cheek-kiss greeting) varies by region: 1 to 4 kisses.",
-            ],
-            "academic_phrases": [
-                {"phrase": "Excusez-moi, pourriez-vous répéter ?", "meaning": "Excuse me, could you repeat that?"},
-                {"phrase": "Je n'ai pas compris.", "meaning": "I didn't understand."},
-                {"phrase": "Comment dit-on... en français ?", "meaning": "How do you say ... in French?"},
-            ],
-        },
-        "ja": {
-            "quick_tips": [
-                "Remove shoes when entering homes — look for the genkan (entryway).",
-                "Bow instead of handshake as a default greeting.",
-                "Never stick chopsticks upright in rice — funeral association.",
-            ],
-            "academic_phrases": [
-                {"phrase": "もう一度言っていただけますか？", "meaning": "Could you say that again, please?"},
-                {"phrase": "分かりません。", "meaning": "I don't understand."},
-                {"phrase": "日本語で何と言いますか？", "meaning": "How do you say it in Japanese?"},
-            ],
-        },
-        "es": {
-            "quick_tips": [
-                "Meal times are later in Spain: lunch 2–4 PM, dinner 9–11 PM.",
-                "'Señor/Señora' with last name is standard professional address.",
-                "Direct eye contact during conversation is a sign of respect.",
-            ],
-            "academic_phrases": [
-                {"phrase": "¿Podría repetir eso, por favor?", "meaning": "Could you repeat that, please?"},
-                {"phrase": "No entendí.", "meaning": "I didn't understand."},
-                {"phrase": "¿Cómo se dice... en español?", "meaning": "How do you say ... in Spanish?"},
-            ],
-        },
-    }
-
-    return {
-        "lang": lang,
-        **note_data,
-        "extended": extended.get(lang, {}),
-    }
+    """Return detailed cultural notes for a language code."""
+    normalized = lang.lower()
+    if normalized not in _CULTURAL_NOTES:
+        raise HTTPException(status_code=404, detail=f'No cultural notes found for "{lang}".')
+    return {"lang": normalized, **_CULTURAL_NOTES[normalized]}
 
 
 # ── WebSocket: real-time sign streaming ────────────────────────────────────────
 
-# Simple in-memory connection manager
 class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
@@ -783,7 +933,6 @@ class ConnectionManager:
         self.active.append(ws)
 
     def disconnect(self, ws: WebSocket):
-        self.active.discard(ws) if hasattr(self.active, "discard") else None
         if ws in self.active:
             self.active.remove(ws)
 
@@ -814,11 +963,6 @@ async def websocket_sign(ws: WebSocket):
         { "type": "SIGN_SEQUENCE", "signs": ["HELLO", "HOW", "ARE", "YOU"] }
         { "type": "SIGN_WORD", "word": "HELLO", "pose": "HELLO", "durationMs": 600 }
         { "type": "PONG" }
-        { "type": "ERROR", "message": "..." }
-
-    PRODUCTION SWAP:
-        Replace mock sign lookup with a trained NLP → ASL gloss model.
-        e.g. run text through a seq2seq model that maps English to ASL gloss order.
     """
     await manager.connect(ws)
     try:
@@ -840,10 +984,8 @@ async def websocket_sign(ws: WebSocket):
                 if not text:
                     continue
 
-                # Build sign sequence from transcript
                 words = text.upper().replace(",", "").replace(".", "").replace("?", "").split()
 
-                # Mock word → ASL gloss mapping
                 _GLOSS_MAP: dict[str, str] = {
                     "HELLO": "HELLO", "HI": "HELLO", "HEY": "HELLO",
                     "THANK": "THANK_YOU", "THANKS": "THANK_YOU",
@@ -866,7 +1008,6 @@ async def websocket_sign(ws: WebSocket):
                             "durationMs": 600 + len(word) * 30,
                         })
                     else:
-                        # Fingerspell unknown words
                         for letter in word:
                             if letter.isalpha():
                                 sign_seq.append({
@@ -875,19 +1016,14 @@ async def websocket_sign(ws: WebSocket):
                                     "durationMs": 350,
                                 })
 
-                # Send full sequence summary first
                 await ws.send_text(json.dumps({
                     "type": "SIGN_SEQUENCE",
                     "signs": [s["pose"] for s in sign_seq],
                     "total": len(sign_seq),
                 }))
 
-                # Then stream word-by-word with timing so the client can sync
                 for item in sign_seq:
-                    await ws.send_text(json.dumps({
-                        "type": "SIGN_WORD",
-                        **item,
-                    }))
+                    await ws.send_text(json.dumps({"type": "SIGN_WORD", **item}))
                     await asyncio.sleep(item["durationMs"] / 1000)
 
                 await ws.send_text(json.dumps({"type": "SIGN_SEQUENCE_DONE"}))
@@ -900,64 +1036,3 @@ async def websocket_sign(ws: WebSocket):
 
     except WebSocketDisconnect:
         manager.disconnect(ws)
-
-@app.get("/api/history", tags=["History"])
-def get_history(entry_type: str | None = None, limit: int = 10):
-    """
-    Return history entries from the in-memory store, newest first.
-    Optionally filter by entry_type ('translation' or 'sign_expression').
-    """
-    entries = list(reversed(list(_history_store.values())))
-    if entry_type:
-        entries = [e for e in entries if e["entry_type"] == entry_type]
-    return {"data": entries[:limit]}
-
-
-# ── Phrasebook endpoints ───────────────────────────────────────────────────────
-
-@app.get("/api/phrasebook", tags=["Phrasebook"])
-def get_phrasebook(limit: int = 100):
-    """Return all phrasebook-flagged history entries, newest first."""
-    entries = [
-        e for e in reversed(list(_history_store.values()))
-        if e.get("isPhrasebook")
-    ]
-    return {"data": entries[:limit]}
-
-
-@app.post("/api/phrasebook", tags=["Phrasebook"])
-def save_phrasebook(payload: dict):
-    """Mark an existing history entry as a phrasebook item."""
-    history_id = str(payload.get("history_id", "")).strip()
-    if not history_id:
-        raise HTTPException(status_code=422, detail="A history_id is required to save a phrase.")
-    entry = _history_store.get(history_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"History entry '{history_id}' not found.")
-    entry["isPhrasebook"] = True
-    _save_history_store()
-    return {"entry": entry}
-
-
-@app.delete("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
-def delete_phrasebook(entry_id: str):
-    """Remove the phrasebook flag from a history entry."""
-    entry = _history_store.get(entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"Entry '{entry_id}' not found.")
-    entry["isPhrasebook"] = False
-    _save_history_store()
-    return {"deleted": True}
-
-
-@app.patch("/api/phrasebook/{entry_id}", tags=["Phrasebook"])
-def patch_phrasebook_srs(entry_id: str, payload: dict):
-    """Update the SRS extra data on a phrasebook entry."""
-    entry = _history_store.get(entry_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"Entry '{entry_id}' not found.")
-    extra = entry.get("extra", {})
-    extra.update(payload.get("extra", {}))
-    entry["extra"] = extra
-    _save_history_store()
-    return {"entry": entry}

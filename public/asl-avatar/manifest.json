@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "cachedAt": "2026-07-05T13:52:33.347Z",
+  "files": {
+    "cwa/allcsa.js": {
+      "sha256": "3d4a7d2b1ce3ba67d990c6b79587493dca7cc38738ba8a1f3607f362da103ed9",
+      "bytes": 5666707,
+      "url": "https://3dasl-avatar.vercel.app/cwa/allcsa.js"
+    },
+    "cwa/cwasa.css": {
+      "sha256": "3298515999fa65d2286d9441f04a9de515d82e7ba91310e6b37b522b1837979e",
+      "bytes": 2273,
+      "url": "https://3dasl-avatar.vercel.app/cwa/cwasa.css"
+    },
+    "avatars/anna.jar": {
+      "sha256": "d872ac4c1553687dfe5a8c5ea36543da6b0ac02b7944c705628d45fa41d2c091",
+      "bytes": 1650938,
+      "url": "https://3dasl-avatar.vercel.app/avatars/anna.jar"
+    },
+    "avatars/marc.jar": {
+      "sha256": "23fbd4a949f168e0b97c802e467f0fc6504838d31d4ea6b32d6e6bee1308f3d4",
+      "bytes": 2972619,
+      "url": "https://3dasl-avatar.vercel.app/avatars/marc.jar"
+    },
+    "avatars/francoise.jar": {
+      "sha256": "d9a0ccb046c8ad535e1e5971627b34de753e0a137d9c4f02c49e3bf65452110b",
+      "bytes": 6918102,
+      "url": "https://3dasl-avatar.vercel.app/avatars/francoise.jar"
+    },
+    "cwa/h2s.xsl": {
+      "sha256": "e96036c343e15a29c1e00f9e95e7ef0b47196eb61583e97b1984b4aa2674cdea",
+      "bytes": 98025,
+      "url": "https://vhg.cmp.uea.ac.uk/tech/jas/vhg2021/cwa/h2s.xsl"
+    },
+    "cwa/shaders/qskin.vert": {
+      "sha256": "9b5f055bcef49472c10925daff47d7dfdb00a7b19d1ba4c3aad1ab4b7b13fd7b",
+      "bytes": 14760,
+      "url": "https://vhg.cmp.uea.ac.uk/tech/jas/vhg2021/cwa/shaders/qskin.vert"
+    },
+    "cwa/shaders/qskin.frag": {
+      "sha256": "3986a7a7ffb26e5aff8677d216decd45945ff5e84dd2c99eb5042bf0986f48ff",
+      "bytes": 1022,
+      "url": "https://vhg.cmp.uea.ac.uk/tech/jas/vhg2021/cwa/shaders/qskin.frag"
+    },
+    "avatars/COMMON.jar": {
+      "sha256": "80e35056778ff74b1ea81eed42342051e6f11964afc5d8858563a2016f3585cb",
+      "bytes": 8621,
+      "url": "https://3dasl-avatar.vercel.app/avatars/COMMON.jar"
+    }
+  },
+  "sigmlRemote": "https://3dasl-avatar.vercel.app/sigml/"
+}

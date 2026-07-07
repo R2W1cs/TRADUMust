@@ -26,7 +26,12 @@
   window.SignBridge.AvatarOverlay = {
 
     _el:          null,   // root overlay element
-    _avatarEl:    null,   // SVG container
+    _avatarEl:    null,   // avatar container (holds iframe or SVG fallback)
+    _iframeCwasaEl: null,  // CWASA 3D avatar (3dasl-avatar.vercel.app)
+    _iframeHandsEl: null,  // legacy — unused
+    _iframeModelEl: null,  // legacy — unused
+    _svgContainerEl: null, // 2D vector SVG container
+    _d2FrameEl:   null,   // Direction-2 recognizer iframe
     _captionEl:   null,   // caption text element
     _hintEl:      null,   // educational hint element
     _resizeHandle:null,
@@ -45,6 +50,8 @@
     _wordBubble:  null,
     _avgDuration: 1000,
     _currentSign: null,
+    _d2Enabled:   false,
+    _cwasaReady:  false,
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -64,7 +71,15 @@
       // Listen for settings changes
       window.SignBridge.StorageManager.onChange((changes) => {
         if ('avatarEnabled' in changes) {
-          changes.avatarEnabled ? this.show() : this.hide();
+          if (changes.avatarEnabled) {
+            if (!this._el) {
+              this.init();
+            } else {
+              this.show();
+            }
+          } else {
+            this.hide();
+          }
         }
         if ('showCaptions' in changes) {
           this._captionEl.style.display = changes.showCaptions ? 'block' : 'none';
@@ -75,14 +90,31 @@
         if ('avatarOpacity' in changes) {
           this._el.style.opacity = changes.avatarOpacity;
         }
+        if ('avatarMode' in changes) {
+          this.setAvatarMode(changes.avatarMode);
+        }
       });
 
-      // Apply opacity transition to avatar wrap for flash effect
-      if (this._avatarEl) {
-        this._avatarEl.style.transition = 'opacity 0.08s ease';
-      }
+      // Listen for Direction-2 sign recognition results + CWASA ready / errors
+      window.addEventListener('message', (e) => {
+        if (e.data?.type === 'TRADUMUST_READY') {
+          this._cwasaReady = true;
+        }
+        if (e.data?.type === 'TRADUMUST_ERROR' && this._settings.avatarMode === '3d-cwasa') {
+          console.warn('[SignBridge] CWASA error, falling back to 2D:', e.data.message);
+          this.setAvatarMode('2d');
+        }
+        if (e.data?.type === 'SB_SIGN' && this._d2Enabled) {
+          const { label, key } = e.data;
+          this.updateCaption(`Signing: ${label || key}`);
+        }
+        if (e.data?.type === 'SB_SIGN_CLEARED' && this._d2Enabled) {
+          if (this._captionEl) this._captionEl.textContent = '';
+        }
+      });
 
-      // Show resting avatar immediately
+      // Set initial mode and show resting avatar immediately
+      this.setAvatarMode(this._settings.avatarMode || '2d');
       this._renderCurrentSign(null);
     },
 
@@ -108,6 +140,47 @@
     toggle() {
       this._visible ? this.hide() : this.show();
     },
+
+    setAvatarMode(mode) {
+      // Migrate legacy 3D modes to CWASA avatar
+      if (mode === '3d' || mode === '3d-hands' || mode === '3d-model') mode = '3d-cwasa';
+      this._settings.avatarMode = mode;
+
+      const is2d = mode === '2d';
+      const isCwasa = mode === '3d-cwasa';
+
+      if (this._svgContainerEl) {
+        this._svgContainerEl.style.display = is2d ? 'flex' : 'none';
+      }
+      if (this._iframeCwasaEl) {
+        this._iframeCwasaEl.style.display = isCwasa ? 'block' : 'none';
+      }
+      if (this._iframeHandsEl) this._iframeHandsEl.style.display = 'none';
+      if (this._iframeModelEl) this._iframeModelEl.style.display = 'none';
+
+      this._renderCurrentSign(this._currentSign);
+    },
+
+    _getActive3dIframe() {
+      const mode = this._settings.avatarMode;
+      if (mode === '3d' || mode === '3d-hands' || mode === '3d-model' || mode === '3d-cwasa') {
+        return this._iframeCwasaEl;
+      }
+      return null;
+    },
+
+    _postTo3dIframes(message) {
+      if (this._iframeCwasaEl?.contentWindow) {
+        this._iframeCwasaEl.contentWindow.postMessage(message, '*');
+      }
+    },
+
+    _signToGlossText(sign) {
+      if (!sign) return '';
+      const raw = sign._word || sign.gloss || sign._key || '';
+      return String(raw).replace(/_/g, ' ').trim();
+    },
+
 
     /** Called when the video element fires a 'pause' event. */
     pauseSigning() {
@@ -177,17 +250,79 @@
       logo.style.cssText = 'font-size: 9px; color: rgba(255,255,255,0.5); font-family: sans-serif; letter-spacing: 0.5px;';
       header.appendChild(logo);
 
+      // ── Zoom controls (in header, right side) ────────────────────────────
+      const zoomGroup = document.createElement('div');
+      zoomGroup.style.cssText = 'display:flex; align-items:center; gap:3px; margin-left:auto;';
+
+      const _zoomBtnStyle = `
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 4px;
+        color: rgba(255,255,255,0.65);
+        font-size: 12px; font-family: sans-serif;
+        width: 18px; height: 14px;
+        line-height: 1; cursor: pointer;
+        padding: 0; display:flex; align-items:center; justify-content:center;
+      `;
+
+      const zoomInBtn  = document.createElement('button');
+      const zoomOutBtn = document.createElement('button');
+      const zoomLabel  = document.createElement('span');
+
+      zoomInBtn.textContent  = '+';
+      zoomOutBtn.textContent = '−';
+      zoomInBtn.title  = 'Zoom in';
+      zoomOutBtn.title = 'Zoom out';
+      zoomInBtn.style.cssText  = _zoomBtnStyle;
+      zoomOutBtn.style.cssText = _zoomBtnStyle;
+      zoomLabel.style.cssText  = 'font-size:8px; color:rgba(255,255,255,0.28); font-family:sans-serif; min-width:24px; text-align:center;';
+      zoomLabel.textContent    = '100%';
+      this._zoomLabel = zoomLabel;
+
+      let _zoomLabelTimer = null;
+      const _updateZoomLabel = (pct) => {
+        zoomLabel.textContent = pct + '%';
+        clearTimeout(_zoomLabelTimer);
+        _zoomLabelTimer = setTimeout(() => { zoomLabel.textContent = ''; }, 1800);
+      };
+
+      const _sendZoom = (type) => {
+        const frame = this._getActive3dIframe();
+        if (frame?.contentWindow) {
+          frame.contentWindow.postMessage({ type }, '*');
+        }
+      };
+
+      zoomInBtn.addEventListener('click',  (e) => { e.stopPropagation(); _sendZoom('SB_ZOOM_IN');  });
+      zoomOutBtn.addEventListener('click', (e) => { e.stopPropagation(); _sendZoom('SB_ZOOM_OUT'); });
+
+      // Zoom level badge from iframe response
+      window.addEventListener('message', (e) => {
+        if (e.data?.type === 'SB_ZOOM_LEVEL') _updateZoomLabel(e.data.pct);
+      });
+
+      // Scroll wheel on the whole overlay → zoom
+      overlay.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        _sendZoom(e.deltaY < 0 ? 'SB_ZOOM_IN' : 'SB_ZOOM_OUT');
+      }, { passive: false });
+
+      zoomGroup.appendChild(zoomOutBtn);
+      zoomGroup.appendChild(zoomLabel);
+      zoomGroup.appendChild(zoomInBtn);
+      header.appendChild(zoomGroup);
+
       const closeBtn = document.createElement('button');
       closeBtn.textContent = '×';
       closeBtn.title = 'Hide (Alt+Shift+S to restore)';
       closeBtn.style.cssText = `
         background: none; border: none; color: rgba(255,255,255,0.4);
-        font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1;
+        font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1; margin-left:4px;
       `;
       closeBtn.addEventListener('click', (e) => { e.stopPropagation(); this.hide(); });
       header.appendChild(closeBtn);
 
-      // ── Avatar SVG container ─────────────────────────────────────────────
+      // ── 3D Avatar iframe ─────────────────────────────────────────────────
       const avatarWrap = document.createElement('div');
       avatarWrap.className = 'sb-avatar-wrap';
       avatarWrap.style.cssText = `
@@ -197,9 +332,45 @@
         overflow: hidden;
         position: relative;
         opacity: 1;
-        transition: opacity 0.08s ease;
+        transition: opacity 0.12s ease;
       `;
       this._avatarEl = avatarWrap;
+
+      // 2D SVG Container
+      const svgContainer = document.createElement('div');
+      svgContainer.className = 'sb-avatar-2d';
+      svgContainer.style.cssText = `
+        width: 100%;
+        height: ${Math.round(avatarSize * 0.85)}px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+      `;
+      avatarWrap.appendChild(svgContainer);
+      this._svgContainerEl = svgContainer;
+
+      // CWASA 3D avatar iframe (https://3dasl-avatar.vercel.app)
+      const iframeHeight = Math.round(avatarSize * 0.85);
+      try {
+        const cwasaFrame = document.createElement('iframe');
+        cwasaFrame.src = chrome.runtime.getURL('3d/cwasa-embed.html');
+        cwasaFrame.style.cssText = `
+          width: 100%;
+          height: ${iframeHeight}px;
+          border: none;
+          background: transparent;
+          display: none;
+        `;
+        cwasaFrame.setAttribute('allow', 'autoplay');
+        cwasaFrame.removeAttribute('sandbox');
+        cwasaFrame.setAttribute('scrolling', 'no');
+        cwasaFrame.setAttribute('title', '3D CWASA signing avatar');
+        this._iframeCwasaEl = cwasaFrame;
+        avatarWrap.appendChild(cwasaFrame);
+      } catch (e) {
+        console.warn('[SignBridge] Could not create CWASA iframe:', e);
+      }
 
       // ── Hint tooltip ─────────────────────────────────────────────────────
       const hint = document.createElement('div');
@@ -377,55 +548,47 @@
     },
 
     /**
-     * Flash the avatar out (0.08s) then swap the sign and fade back in.
-     * For rest-pose transitions (sign=null) just cross-fade without hard flash.
+     * Cross-fade transition when swapping signs.
+     * With 3D iframe: just send pose message (iframe handles its own lerp).
      */
     _renderWithFlash(sign) {
-      if (!this._avatarEl) {
-        this._renderCurrentSign(sign);
-        return;
-      }
-
-      clearTimeout(this._flashTimer);
-
-      if (sign === null) {
-        // Soft fade to rest — no harsh flash needed
-        this._renderCurrentSign(null);
-        return;
-      }
-
-      // Fade out
-      this._avatarEl.style.opacity = '0';
-
-      // After 0.1 s: swap content + fade back in
-      this._flashTimer = setTimeout(() => {
-        this._renderCurrentSign(sign);
-        this._avatarEl.style.opacity = '1';
-      }, 100);
+      this._renderCurrentSign(sign);
     },
 
     _renderCurrentSign(sign) {
       this._currentSign = sign;
-      if (!this._avatarEl) return;
 
-      const renderer = window.SignBridge.AvatarRenderer;
-      const size     = this._el ? parseInt(this._el.style.width) || 280 : 280;
+      if (this._settings.avatarMode === '2d') {
+        if (this._svgContainerEl && window.SignBridge.AvatarRenderer) {
+          const size = this._settings.avatarSize || 280;
+          const opts = { width: size, height: Math.round(size * 0.85), showLabels: false };
+          if (sign) {
+            this._svgContainerEl.innerHTML = window.SignBridge.AvatarRenderer.render(sign, opts);
+          } else {
+            this._svgContainerEl.innerHTML = window.SignBridge.AvatarRenderer.renderRest(opts);
+          }
+        }
+      } else {
+        const frame = this._getActive3dIframe();
+        if (frame?.contentWindow) {
+          if (sign) {
+            const text = this._signToGlossText(sign);
+            frame.contentWindow.postMessage({ type: 'TRADUMUST_PLAY', text }, '*');
+          } else {
+            frame.contentWindow.postMessage({ type: 'TRADUMUST_RESET' }, '*');
+          }
+        }
+      }
 
-      const svgStr = sign
-        ? renderer.render(sign, { width: size, height: Math.round(size * 0.72), showLabels: false })
-        : renderer.renderRest({ width: size, height: Math.round(size * 0.72) });
-
-      // Preserve the hint element when replacing SVG
-      this._avatarEl.innerHTML = svgStr;
-      this._avatarEl.appendChild(this._hintEl);
-
-      // Update caption
+      // ── Update caption bar ──────────────────────────────────────────────────
       if (sign && this._captionEl) {
         const word = sign._word || sign.gloss || '';
         if (word) {
-          this._captionEl.textContent = word.toUpperCase();
+          this._captionEl.textContent = word.replace(/_/g, ' ').toUpperCase();
           this._captionEl.style.color = sign._isFingerspell ? '#93C5FD' : 'rgba(255,255,255,0.85)';
         }
+      } else if (!sign && this._captionEl) {
+        this._captionEl.textContent = '';
       }
     },
 
@@ -519,8 +682,15 @@
         const dx = clientX - this._resizeStart.mouseX;
         const newSize = Math.max(150, Math.min(480, this._resizeStart.size + dx));
         this._el.style.width = `${newSize}px`;
-        // Re-render at new size
-        this._renderCurrentSign(this._currentSign);
+        // Update iframe heights proportionally
+        const h = `${Math.round(newSize * 0.85)}px`;
+        if (this._iframeCwasaEl) this._iframeCwasaEl.style.height = h;
+        if (this._svgContainerEl) {
+          this._svgContainerEl.style.height = `${Math.round(newSize * 0.85)}px`;
+          if (this._settings.avatarMode === '2d') {
+            this._renderCurrentSign(this._currentSign);
+          }
+        }
       };
 
       const onEnd = () => {
@@ -561,6 +731,52 @@
       if (avatarSize) {
         this._el.style.width = `${avatarSize}px`;
       }
+    },
+
+    // ── Direction 2: Sign-to-Text recognition iframe ──────────────────────────
+
+    enableSignRecognition() {
+      if (this._d2Enabled || !this._el) return;
+      this._d2Enabled = true;
+
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.src = chrome.runtime.getURL('d2/recognizer.html');
+        iframe.allow = 'camera';
+        iframe.style.cssText = `
+          width: 100%;
+          height: 200px;
+          border: none;
+          border-radius: 0 0 12px 12px;
+          display: block;
+          background: #0a0a14;
+        `;
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        this._d2FrameEl = iframe;
+
+        // Insert after caption bar, before footer
+        const footer = this._el.querySelector('div:last-child');
+        this._el.insertBefore(iframe, footer);
+
+        console.log('[SignBridge D2] Recognizer panel injected');
+      } catch (e) {
+        console.warn('[SignBridge] Could not inject D2 iframe:', e);
+      }
+    },
+
+    disableSignRecognition() {
+      if (!this._d2Enabled) return;
+      this._d2Enabled = false;
+
+      if (this._d2FrameEl) {
+        this._d2FrameEl.contentWindow?.postMessage({ type: 'SB_D2_STOP' }, '*');
+        this._d2FrameEl.remove();
+        this._d2FrameEl = null;
+      }
+    },
+
+    toggleSignRecognition() {
+      this._d2Enabled ? this.disableSignRecognition() : this.enableSignRecognition();
     },
   };
 

@@ -69,6 +69,7 @@ describe('Module loading', () => {
 describe('SIGNS dictionary integrity', () => {
   const VALID_HANDS = new Set([
     'FLAT','FIST','POINT','V','C','OK','THUMB_UP','ILY','CLAW','HORNS','L','A','O',
+    'X','BENT_V','PINCH_MID','OPEN_5','H','W','Y'
   ]);
   const VALID_EXPRESSIONS = new Set([
     'NEUTRAL','HAPPY','QUESTION','WH_QUESTION','NEGATIVE','EMPHATIC',

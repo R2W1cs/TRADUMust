@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { Signer2D } from "@/components/Signer2D";
-import { type WordMeta } from "@/components/VisualGlossBoard";
-import { createTextToSign, savePhrasebookEntry, saveRecognizedSign, getPhrasebookEntries, type HistoryEntry } from "@/lib/api-client";
+import { recognizeApi } from "@/lib/tradumust-api";
+import { AslAvatar3D, type AslAvatar3DHandle } from "@/components/AslAvatar3D";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { classifyLandmarks, applyAslGrammar } from "@/lib/landmark-classifier";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, HandMetal, Eye, Webcam, VideoOff, Loader2, Info, BookOpen, AlertCircle, Camera, Globe, Sparkles, Bookmark, CheckCircle, X, Search, Filter, PlayCircle, History } from "lucide-react";
-import { LogoCompact } from "@/components/Logo";
+import {
+  HandMetal, Eye, Camera, VideoOff, Loader2, Info, BookOpen,
+  AlertCircle, Sparkles, Bookmark, CheckCircle, PlayCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -65,9 +67,57 @@ const GESTURE_TRANSLATIONS: Record<string, { meaning: string; notes: string }> =
   "Pointing Up": { meaning: "You / Look Up / Letter 'D'", notes: "A single index finger pointing up is the letter D, or pointing to someone/something." },
   "Victory":     { meaning: "Peace / Number 2 / Letter 'V'", notes: "The classic V sign translates directly to the letter V and the number 2 in ASL." },
   "ILoveYou":    { meaning: "I Love You",        notes: "A classic ASL sign combining the letters I, L, and Y into a single universal handshape." },
+  "DYNAMIC_THANK_YOU": { meaning: "Thank You", notes: "Downward palm sweep from chin — like blowing a grateful kiss." },
+  "DYNAMIC_PLEASE":    { meaning: "Please",    notes: "Circular palm on chest — PLEASE and THANK YOU share the same base motion." },
+  "HELLO":             { meaning: "Hello",              notes: "Flat hand waves outward from the forehead — a relaxed salute." },
+  "THANK_YOU":         { meaning: "Thank You",          notes: "Flat hand moves forward and down from the chin." },
+  "PLEASE":            { meaning: "Please",             notes: "Flat hand circles on the chest." },
+  "SORRY":             { meaning: "Sorry",              notes: "Closed fist circles on the chest." },
+  "GOODBYE":           { meaning: "Goodbye",            notes: "Open hand waves side to side." },
+  "YES":               { meaning: "Yes",                notes: "Fist nods up and down, mimicking a nodding head." },
+  "NO":                { meaning: "No",                 notes: "Index and middle snap together with a shake." },
+  "OK":                { meaning: "OK / Fine",          notes: "Index and thumb form a circle." },
+  "HAPPY":             { meaning: "Happy",              notes: "Flat hand brushes upward from the chest." },
+  "SAD":               { meaning: "Sad",                notes: "Flat hands slide down the face like tears falling." },
+  "TIRED":             { meaning: "Tired",              notes: "Both hands drop from the chest." },
+  "UNDERSTAND":        { meaning: "Understand",         notes: "Index flicks upward at the temple." },
+  "DONT_UNDERSTAND":   { meaning: "Don't Understand",   notes: "Index shakes at the temple." },
+  "THINK":             { meaning: "Think",              notes: "Index circles at the temple." },
+  "KNOW":              { meaning: "Know",               notes: "Flat fingertips tap the temple." },
+  "FORGET":            { meaning: "Forget",             notes: "Flat hand wipes across the forehead then flicks away." },
+  "STOP":              { meaning: "Stop",               notes: "Flat hand chops sharply downward." },
+  "HELP":              { meaning: "Help",               notes: "Thumb-up fist lifts upward." },
+  "FINISH":            { meaning: "Finish / Done",      notes: "Open hands flip outward." },
+  "START":             { meaning: "Start / Begin",      notes: "Index twists into the non-dominant palm." },
+  "GIVE":              { meaning: "Give",               notes: "Flat hand extends forward from the chest." },
+  "ME":                { meaning: "Me / I",             notes: "Index points to yourself." },
+  "YOU":               { meaning: "You",                notes: "Index points at the other person." },
+  "SEE":               { meaning: "See / Look",         notes: "V-shape at the eyes." },
+  "SAY":               { meaning: "Say / Tell",         notes: "Index at the mouth moves forward." },
+  "HEARING":           { meaning: "Hearing (person)",   notes: "Index circles at the mouth." },
+  "SPEAK":             { meaning: "Speak / Voice",      notes: "Index moves upward from the mouth." },
+  "PEACE":             { meaning: "Peace / 2 / Victory",notes: "V-shape at neutral level." },
+  "CHOOSE":            { meaning: "Choose / Select",    notes: "V-hand pinches downward." },
+  "QUESTION":          { meaning: "Question",           notes: "Index traces a question mark in the air." },
+  "WRITE":             { meaning: "Write",              notes: "A-hand scribbles across the non-dominant palm." },
+  "LEARN":             { meaning: "Learn",              notes: "Claw hand lifts knowledge from palm to the forehead." },
+  "TOMORROW":          { meaning: "Tomorrow",           notes: "Thumb at the cheek pointing forward." },
+  "I_LOVE_YOU":        { meaning: "I Love You ❤️",      notes: "I+L+Y combined into one handshape." },
+  "PHONE":             { meaning: "Phone / Call",       notes: "Thumb and pinky form a handset at the ear." },
+  "PLAY":              { meaning: "Play / Fun",         notes: "Y-hands shake loosely." },
+  "ROCK":              { meaning: "Rock On / Horns",    notes: "Index and pinky extended." },
+  "THREE_FINGERS":     { meaning: "Wait / Pause",       notes: "Three fingers held still." },
+  "THUMB_UP":          { meaning: "Good / Approve",     notes: "Thumbs up — universal approval gesture." },
+  "ONE":               { meaning: "1",                  notes: "Index finger raised." },
+  "THREE":             { meaning: "3",                  notes: "Index, middle, and ring fingers raised." },
+  "FOUR":              { meaning: "4",                  notes: "Four fingers extended with thumb tucked." },
+  "FIVE":              { meaning: "5 / Open Hand",      notes: "All five fingers spread wide." },
+  "TEN":               { meaning: "10",                 notes: "Thumb shakes." },
+  "TWO_CIRCLE":        { meaning: "2 / Again / Repeat", notes: "V-hand circles." },
+  "FIST":              { meaning: "Fist / Letter S",    notes: "Closed fist." },
 };
 
-// ── Sub-components ─────────────────────────────────────────────────────────
+// ── WebcamFeed ─────────────────────────────────────────────────────────────
 function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onToggle: () => void; onRecognize: (text: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,11 +145,19 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
             const vision = await FilesetResolver.forVisionTasks(
               "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm"
             );
-            recognizerRef.current = await GestureRecognizer.createFromOptions(vision, {
-              baseOptions: { modelAssetPath: "/models/gesture_recognizer.task", delegate: "GPU" },
-              runningMode: "VIDEO",
+            const opts = {
+              baseOptions: { modelAssetPath: "/models/gesture_recognizer.task", delegate: "GPU" as const },
+              runningMode: "VIDEO" as const,
               numHands: 2,
-            });
+            };
+            try {
+              recognizerRef.current = await GestureRecognizer.createFromOptions(vision, opts);
+            } catch {
+              recognizerRef.current = await GestureRecognizer.createFromOptions(vision, {
+                ...opts,
+                baseOptions: { ...opts.baseOptions, delegate: "CPU" },
+              });
+            }
           }
           setModelReady(true);
 
@@ -123,6 +181,7 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
                 ctx.translate(-canvas.width, 0);
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+                let usedClassifier = false;
                 if (results.landmarks && results.landmarks.length > 0) {
                   const drawingUtils = new DrawingUtils(ctx);
                   const landmarks = results.landmarks[0];
@@ -131,19 +190,8 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
                   motionBufferRef.current.push({ x: palm.x, y: palm.y, time: now });
                   if (motionBufferRef.current.length > 40) motionBufferRef.current.shift();
 
-                  const buffer = motionBufferRef.current;
-                  if (buffer.length === 40) {
-                    const dx = buffer[39].x - buffer[0].x;
-                    const dy = buffer[39].y - buffer[0].y;
-                    if (dy > 0.2 && Math.abs(dx) < 0.1) onRecognize("DYNAMIC_THANK_YOU");
-
-                    const midX = buffer.reduce((a, b) => a + b.x, 0) / 40;
-                    const midY = buffer.reduce((a, b) => a + b.y, 0) / 40;
-                    const variances = buffer.map(p => Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2));
-                    const avgRadius = variances.reduce((a, b) => a + b, 0) / 40;
-                    const stdDev = Math.sqrt(variances.reduce((a, b) => a + (b - avgRadius) ** 2, 0) / 40);
-                    if (avgRadius > 0.05 && stdDev < 0.02) onRecognize("DYNAMIC_PLEASE");
-                  }
+                  const classified = classifyLandmarks(landmarks, motionBufferRef.current, results.landmarks[1]);
+                  if (classified) { onRecognize(classified.key); usedClassifier = true; }
 
                   for (const lms of results.landmarks) {
                     const pixelLandmarks = lms.map((l: any) => ({ x: l.x * canvas.width, y: l.y * canvas.height, z: l.z || 0 }));
@@ -153,7 +201,7 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
                 }
                 ctx.restore();
 
-                if (results.gestures && results.gestures.length > 0 && results.gestures[0].length > 0) {
+                if (!usedClassifier && results.gestures && results.gestures.length > 0 && results.gestures[0].length > 0) {
                   const gesture = results.gestures[0][0];
                   if (gesture.categoryName !== "None") onRecognize(gesture.categoryName.replace("_", " "));
                 }
@@ -200,7 +248,7 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
 
       {active && !modelReady && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-900/60 backdrop-blur-md">
-          <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
+          <Loader2 className="w-10 h-10 text-[var(--brand-primary)] animate-spin" />
           <p className="text-white font-bold tracking-widest uppercase text-xs">Initializing ML Model</p>
         </div>
       )}
@@ -244,7 +292,7 @@ function WebcamFeed({ active, onToggle, onRecognize }: { active: boolean; onTogg
           "absolute top-4 right-4 p-3.5 rounded-full shadow-xl transition-all z-10 border",
           active
             ? "bg-red-500/20 hover:bg-red-500/40 border-red-500/50 text-red-300"
-            : "bg-purple-600 hover:bg-purple-500 border-purple-400/50 text-white"
+            : "bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] border-[var(--brand-primary)]/50 text-white"
         )}
       >
         {active ? <VideoOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
@@ -260,42 +308,27 @@ export default function SignPage() {
   const [recognizedText, setRecognizedText] = useState("");
   const [recognizing, setRecognizing] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
-  const [expressInput, setExpressInput] = useState("Hello");
-  const [avatarAnimating, setAvatarAnimating] = useState(false);
-  const [glossData, setGlossData] = useState<{ sentiment?: any; metadata?: WordMeta[] }>({});
-  const [currentSign, setCurrentSign] = useState<{ word: string; tag: string } | null>(null);
+  const [expressInput, setExpressInput] = useState("مرحبا");
+  const avatarRef = useRef<AslAvatar3DHandle>(null);
   const [signApiError, setSignApiError] = useState<string | null>(null);
-  const signTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const smoothingBufferRef = useRef<Record<string, number>>({});
-  const SMOOTHING_THRESHOLD = 8;
+  const SMOOTHING_THRESHOLD = 5;
 
   const [sentenceBuffer, setSentenceBuffer] = useState<string[]>([]);
   const lastAddedSignRef = useRef<string | null>(null);
   const signHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [lastHistoryId, setLastHistoryId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedToPhrasebook, setSavedToPhrasebook] = useState(false);
-  const [selectedSignLang, setSelectedSignLang] = useState("ASL");
-  const [recognitionSaving, setRecognitionSaving] = useState(false);
   const [recognitionSaved, setRecognitionSaved] = useState(false);
+  const [selectedSignLang, setSelectedSignLang] = useState("ASL");
 
-  // Library Modal State
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [libraryPhrases, setLibraryPhrases] = useState<HistoryEntry[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [librarySearch, setLibrarySearch] = useState("");
-  const [libraryCategory, setLibraryCategory] = useState("all");
-
-  // Load persistence
   useEffect(() => {
-    const saved = localStorage.getItem("tradumust_preferred_sign_lang");
+    const saved = localStorage.getItem("signbridge_preferred_sign_lang");
     if (saved) setSelectedSignLang(saved);
   }, []);
 
-  // Save persistence
   const handleLangChange = (lang: string) => {
     setSelectedSignLang(lang);
-    localStorage.setItem("tradumust_preferred_sign_lang", lang);
+    localStorage.setItem("signbridge_preferred_sign_lang", lang);
   };
 
   useEffect(() => {
@@ -317,9 +350,23 @@ export default function SignPage() {
     setRecognizing(false);
 
     const SHORT_TERMS: Record<string, string> = {
-      "Thumb Up": "Good", "Thumb Down": "Bad", "Open Palm": "Wait", "Closed Fist": "Yes",
-      "Pointing Up": "You", "Victory": "Peace", "ILoveYou": "Love",
+      "Thumb Up": "Good", "Thumb Down": "Bad", "Open Palm": "Wait",
+      "Closed Fist": "Yes", "Pointing Up": "You", "Victory": "Peace", "ILoveYou": "Love",
       "DYNAMIC_THANK_YOU": "Thank You", "DYNAMIC_PLEASE": "Please",
+      "HELLO": "Hello", "THANK_YOU": "Thank You", "PLEASE": "Please",
+      "SORRY": "Sorry", "GOODBYE": "Goodbye", "YES": "Yes", "NO": "No", "OK": "OK",
+      "HAPPY": "Happy", "SAD": "Sad", "TIRED": "Tired",
+      "UNDERSTAND": "Understand", "DONT_UNDERSTAND": "Don't Understand",
+      "THINK": "Think", "KNOW": "Know", "FORGET": "Forget",
+      "STOP": "Stop", "HELP": "Help", "FINISH": "Done", "START": "Start", "GIVE": "Give",
+      "ME": "Me", "YOU": "You", "SEE": "See", "SAY": "Say",
+      "HEARING": "Hearing", "SPEAK": "Speak",
+      "PEACE": "Peace", "CHOOSE": "Choose", "QUESTION": "Question",
+      "WRITE": "Write", "LEARN": "Learn", "TOMORROW": "Tomorrow",
+      "I_LOVE_YOU": "I Love You", "PHONE": "Phone", "PLAY": "Play",
+      "ROCK": "Rock On", "THREE_FINGERS": "Wait", "THUMB_UP": "Good",
+      "ONE": "1", "THREE": "3", "FOUR": "4", "FIVE": "5",
+      "TEN": "10", "TWO_CIRCLE": "Again", "FIST": "Yes",
     };
     const word = SHORT_TERMS[rawLabel];
     if (!word) return;
@@ -329,11 +376,11 @@ export default function SignPage() {
       signHoldTimerRef.current = setTimeout(() => {
         setSentenceBuffer(prev => [...prev, word]);
         lastAddedSignRef.current = rawLabel;
-      }, 500);
+      }, 350);
     }
   }, []);
 
-  const animateAvatar = useCallback(async (overrideText?: string) => {
+  const animateAvatar = useCallback((overrideText?: string) => {
     const textToSign = (typeof overrideText === "string" ? overrideText : expressInput).trim();
     if (!textToSign) return;
 
@@ -342,118 +389,37 @@ export default function SignPage() {
       setMode("express");
     }
 
-    setAvatarAnimating(true);
     setSignApiError(null);
-    setLastHistoryId(null);
-    setSavedToPhrasebook(false);
-    try {
-      const data = await createTextToSign({ text: textToSign, sign_language: selectedSignLang });
-      const durationMap: Record<string, number> = {};
-      if (Array.isArray(data.animation_clips)) {
-        for (const clip of data.animation_clips) durationMap[clip.word?.toUpperCase()] = clip.duration_ms;
-      }
-      const mergedMeta: WordMeta[] = (data.syntactic_metadata ?? []).map((m: any) => ({ ...m, duration_ms: durationMap[m.word?.toUpperCase()] }));
-      setGlossData({ sentiment: data.sentiment, metadata: mergedMeta });
-      const totalDuration = mergedMeta.reduce((acc, m) => acc + (m.duration_ms ?? 1100), 0);
-      if (data.history_entry?.id) setLastHistoryId(data.history_entry.id);
-      setTimeout(() => setAvatarAnimating(false), totalDuration + 1000);
-    } catch (err) {
-      setSignApiError(err instanceof Error ? err.message : "Signing service unavailable.");
-      setAvatarAnimating(false);
-    }
-  }, [expressInput, selectedSignLang]);
-
-  const handleSaveToPhrasebook = useCallback(async () => {
-    if (!lastHistoryId) return;
-    setIsSaving(true);
-    try {
-      await savePhrasebookEntry(lastHistoryId);
-      setSavedToPhrasebook(true);
-      setLastHistoryId(null);
-    } catch {
-      // silently ignore duplicate saves
-    } finally {
-      setIsSaving(false);
-    }
-  }, [lastHistoryId]);
+    avatarRef.current?.play(textToSign);
+  }, [expressInput]);
 
   const handleSaveRecognition = useCallback(async () => {
     if (sentenceBuffer.length === 0) return;
-    setRecognitionSaving(true);
+    setIsSaving(true);
     try {
-      const { history_entry } = await saveRecognizedSign({
+      await recognizeApi.save({
         text: sentenceBuffer.join(" "),
-        sign_language: selectedSignLang,
+        signLanguage: selectedSignLang as "ASL" | "BSL" | "LSF",
       });
-      await savePhrasebookEntry(history_entry.id);
       setRecognitionSaved(true);
     } catch (err) {
       console.error("Failed to save recognition:", err);
     } finally {
-      setRecognitionSaving(false);
+      setIsSaving(false);
     }
   }, [sentenceBuffer, selectedSignLang]);
 
-  useEffect(() => {
-    signTimers.current.forEach(clearTimeout);
-    signTimers.current = [];
-    setCurrentSign(null);
-    if (!avatarAnimating || !glossData.metadata?.length) return;
-    const entries = glossData.metadata;
-    const TAG_DUR: Record<string, number> = { TIME: 900, SUBJECT: 1000, OBJECT: 1000, ACTION: 1300, MODIFIER: 800 };
-    function drive(i: number) {
-      if (i >= entries.length) { setCurrentSign(null); return; }
-      const e = entries[i];
-      setCurrentSign({ word: e.word, tag: e.tag });
-      const t = setTimeout(() => drive(i + 1), (e.duration_ms ?? TAG_DUR[e.tag] ?? 1100) + 120);
-      signTimers.current.push(t);
-    }
-    drive(0);
-    return () => { signTimers.current.forEach(clearTimeout); };
-  }, [avatarAnimating, glossData.metadata]);
-
   const currentTip = SIGN_TIPS[tipIndex];
 
-  const fetchLibraryPhrases = useCallback(async () => {
-    setLibraryLoading(true);
-    try {
-      const data = await getPhrasebookEntries(600);
-      setLibraryPhrases(data);
-    } catch (err) {
-      console.error("Failed to load phrase library:", err);
-    } finally {
-      setLibraryLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isLibraryOpen && libraryPhrases.length === 0) {
-      fetchLibraryPhrases();
-    }
-  }, [isLibraryOpen, libraryPhrases.length, fetchLibraryPhrases]);
-
   return (
-    <div className="page-shell font-sans relative">
-      {/* Decorative blobs */}
-      <div className="fixed top-[20%] left-[-20%] w-[60%] h-[60%] bg-purple-400/8 dark:bg-purple-900/20 blur-[150px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-400/6 dark:bg-blue-900/10 blur-[150px] rounded-full pointer-events-none" />
-
-      {/* Header */}
-      <header className="glass-panel px-6 py-4 sticky top-0 z-40 border-b border-[var(--panel-border)] rounded-b-none shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors group">
-            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <LogoCompact />
-          </Link>
-          <h1 className="font-bold text-lg hidden sm:block text-[var(--foreground)]">Sign Language Bridge</h1>
-          <Link href="/translate" className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors bg-blue-500/10 px-4 py-2 rounded-full border border-blue-400/20 dark:border-blue-500/20 hover:border-blue-400/40 group">
-            <Globe className="w-4 h-4" />
-            <span>Translate</span>
-          </Link>
+    <DashboardLayout>
+      <div className="w-full space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Sign studio</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Text ↔ sign translation and AI recognition</p>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col lg:flex-row gap-8 relative z-10 w-full overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-8 w-full">
         {/* ── Main Panel ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
           {/* Mode Toggle */}
@@ -465,7 +431,7 @@ export default function SignPage() {
                 mode === "understand" ? "text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               )}
             >
-              {mode === "understand" && <motion.div layoutId="sign-tab" className="absolute inset-0 bg-purple-600 rounded-xl" style={{ zIndex: -1 }} />}
+              {mode === "understand" && <motion.div layoutId="sign-tab" className="absolute inset-0 bg-[var(--brand-primary)] rounded-xl" style={{ zIndex: -1 }} />}
               <Eye className="w-4 h-4" /> Understand
             </button>
             <button
@@ -475,7 +441,7 @@ export default function SignPage() {
                 mode === "express" ? "text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               )}
             >
-              {mode === "express" && <motion.div layoutId="sign-tab" className="absolute inset-0 bg-purple-600 rounded-xl" style={{ zIndex: -1 }} />}
+              {mode === "express" && <motion.div layoutId="sign-tab" className="absolute inset-0 bg-[var(--brand-primary)] rounded-xl" style={{ zIndex: -1 }} />}
               <HandMetal className="w-4 h-4" /> Express
             </button>
           </div>
@@ -491,7 +457,7 @@ export default function SignPage() {
                   className={cn(
                     "px-4 py-1.5 rounded-xl text-xs font-bold transition-all border",
                     selectedSignLang === lang
-                      ? "bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20"
+                      ? "bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white shadow-sm"
                       : "bg-[var(--surface-deep)] border-[var(--panel-border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   )}
                 >
@@ -505,10 +471,10 @@ export default function SignPage() {
             {/* ── Mode A: Understand Sign ── */}
             {mode === "understand" && (
               <motion.div key="understand" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                <div className="glass-panel p-6 rounded-3xl relative">
+                <div className="surface-card p-6 rounded-[var(--radius-lg)] relative">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                     <h2 className="font-bold text-[var(--foreground)] text-lg flex items-center gap-2">
-                      <Webcam className="w-5 h-5 text-purple-500" /> AI Sign Recognition
+                      <Camera className="w-5 h-5 text-[var(--brand-primary)]" /> AI Sign Recognition
                     </h2>
                     {cameraActive ? (
                       <span className="flex items-center gap-2 text-xs font-bold tracking-widest text-green-700 dark:text-green-400 bg-green-500/10 px-4 py-1.5 rounded-full border border-green-400/20 dark:border-green-500/20 uppercase">
@@ -521,19 +487,19 @@ export default function SignPage() {
                   <WebcamFeed active={cameraActive} onToggle={() => setCameraActive((v) => !v)} onRecognize={handleRecognize} />
                 </div>
 
-                <div className="glass-panel p-6 rounded-3xl">
+                <div className="surface-card p-6 rounded-[var(--radius-lg)]">
                   <div className="flex items-center gap-3 mb-4">
                     <h3 className="font-bold text-[var(--foreground)]">Recognized Sentence</h3>
-                    {recognizing && <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />}
+                    {recognizing && <Loader2 className="w-4 h-4 text-[var(--brand-primary)] animate-spin" />}
                   </div>
 
                   <div className="min-h-[140px] bg-[var(--surface-deep)] rounded-2xl border border-[var(--panel-border)] p-6 flex flex-col justify-center relative overflow-hidden shadow-inner">
                     {sentenceBuffer.length > 0 && (
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 mb-4 bg-purple-500/10 border border-purple-400/20 dark:border-purple-500/20 p-5 rounded-2xl">
-                        <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 mb-4 bg-[var(--brand-primary)]/10 border border-[var(--brand-primary)]/20 dark:border-[var(--brand-primary)]/20 p-5 rounded-2xl">
+                        <p className="text-[10px] font-bold text-[var(--brand-primary)] dark:text-[var(--brand-primary)] uppercase tracking-widest mb-2 flex items-center gap-2">
                           <Info className="w-3 h-3" /> Aggregated Meaning
                         </p>
-                        <p className="text-3xl font-medium text-[var(--foreground)]">{sentenceBuffer.join(" ")}</p>
+                        <p className="text-3xl font-medium text-[var(--foreground)]">{applyAslGrammar(sentenceBuffer).join(" ")}</p>
                         <button
                           onClick={() => { setSentenceBuffer([]); setRecognitionSaved(false); }}
                           className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-red-500 mt-4 bg-[var(--panel-bg)] px-3 py-1.5 rounded-full border border-[var(--panel-border)] transition-colors"
@@ -547,18 +513,18 @@ export default function SignPage() {
                       <div className="flex justify-end mt-2">
                         {recognitionSaved ? (
                           <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold ml-auto bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-400/20 uppercase tracking-widest text-[10px]">
-                            <CheckCircle className="w-4 h-4" /> Saved to Phrasebook
+                            <CheckCircle className="w-4 h-4" /> Saved
                           </span>
                         ) : (
                           <button
                             onClick={handleSaveRecognition}
-                            disabled={recognitionSaving}
-                            className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600/20 text-purple-600 dark:text-purple-400 font-bold text-[10px] uppercase tracking-widest px-4 py-2 rounded-xl border border-purple-400/20 transition-all ml-auto"
+                            disabled={isSaving}
+                            className="flex items-center gap-2 bg-[var(--brand-primary)]/10 hover:bg-[var(--brand-primary)]/20 text-[var(--brand-primary)] dark:text-[var(--brand-primary)] font-bold text-[10px] uppercase tracking-widest px-4 py-2 rounded-xl border border-[var(--brand-primary)]/20 transition-all ml-auto"
                           >
-                            {recognitionSaving ? (
+                            {isSaving ? (
                               <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
                             ) : (
-                              <><Bookmark className="w-3 h-3" /> Save recognized phrase</>
+                              <><Bookmark className="w-3 h-3" /> Save recognized sign</>
                             )}
                           </button>
                         )}
@@ -568,7 +534,7 @@ export default function SignPage() {
                     {recognizedText ? (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10">
                         <div className="flex items-baseline gap-3 mb-2">
-                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-300">
+                          <p className="text-2xl font-bold text-[var(--brand-primary)] dark:text-[var(--brand-primary)]">
                             {GESTURE_TRANSLATIONS[recognizedText]?.meaning || recognizedText}
                           </p>
                           <span className="text-[10px] uppercase tracking-widest font-bold font-mono bg-[var(--tag-bg)] text-[var(--tag-text)] px-2 py-1 rounded border border-[var(--tag-border)]">
@@ -592,78 +558,25 @@ export default function SignPage() {
             {/* ── Mode B: Express Sign ── */}
             {mode === "express" && (
               <motion.div key="express" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                <div className="glass-panel p-6 rounded-3xl">
-                  <h2 className="font-bold text-[var(--foreground)] mb-6 text-lg flex items-center gap-2">
-                    <HandMetal className="w-5 h-5 text-purple-500" /> Text to 3D Avatar
+                <div className="surface-card p-6 rounded-[var(--radius-lg)]">
+                  <h2 className="font-bold text-[var(--foreground)] mb-2 text-lg flex items-center gap-2">
+                    <HandMetal className="w-5 h-5 text-[var(--brand-primary)]" /> Text to 3D Avatar
                   </h2>
+                  <p className="text-sm text-[var(--text-secondary)] mb-6">
+                    CWASA 3D signing avatar — same engine as{" "}
+                    <a href="https://3dasl-avatar.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">
+                      3D ASL Translator
+                    </a>
+                    . Use gloss words from the library or open{" "}
+                    <a href="/express" className="text-indigo-500 hover:underline">Express</a> for the full experience.
+                  </p>
 
-                  <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                    <input
-                      type="text"
-                      value={expressInput}
-                      onChange={(e) => setExpressInput(e.target.value)}
-                      placeholder="Type what you want to sign..."
-                      className="flex-1 bg-[var(--input-bg)] border border-[var(--panel-border)] rounded-xl px-5 py-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/40 placeholder:text-[var(--text-muted)] transition-colors"
-                    />
-                    <button
-                      onClick={animateAvatar}
-                      disabled={avatarAnimating || !expressInput.trim()}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-[0_0_20px_rgba(147,51,234,0.25)] whitespace-nowrap"
-                    >
-                      {avatarAnimating
-                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating</>
-                        : <><Sparkles className="w-4 h-4" /> Animate Avatar</>
-                      }
-                    </button>
-                  </div>
-
-                  {/* Avatar canvas — intentionally keeps dark for video/3D contrast */}
-                  <div className="flex flex-col items-center justify-center bg-slate-950/90 dark:bg-slate-950/80 border border-white/5 rounded-3xl py-12 relative overflow-hidden shadow-inner min-h-[400px]">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl -mr-20 -mt-20" />
-
-                    <div className="relative z-10 p-6 bg-gradient-to-br from-slate-900/50 to-slate-950/80 border border-white/5 rounded-3xl backdrop-blur-xl shadow-2xl">
-                      <Signer2D word={currentSign?.word ?? ""} tag={currentSign?.tag} className="w-80 h-96" />
-                    </div>
-
-                    <div className="h-10 mt-6 flex items-center relative z-10">
-                      <p className={cn("text-2xl font-black tracking-[0.2em] uppercase transition-opacity duration-300 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400", currentSign ? "opacity-100" : "opacity-0")}>
-                        {currentSign?.word ?? "..."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {(lastHistoryId || savedToPhrasebook) && !avatarAnimating && (
-                      <motion.div
-                        key="save-bar"
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="mt-4 flex items-center justify-between bg-[var(--surface)] border border-[var(--panel-border)] rounded-2xl px-5 py-3"
-                      >
-                        <p className="text-sm text-[var(--text-secondary)]">
-                          Sign generated — add it to your phrasebook?
-                        </p>
-                        {savedToPhrasebook ? (
-                          <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                            <CheckCircle className="w-4 h-4" /> Saved
-                          </span>
-                        ) : (
-                          <button
-                            onClick={handleSaveToPhrasebook}
-                            disabled={isSaving}
-                            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-sm px-4 py-2 rounded-xl transition-all"
-                          >
-                            {isSaving
-                              ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
-                              : <><Bookmark className="w-4 h-4" /> Save to Phrasebook</>
-                            }
-                          </button>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <AslAvatar3D
+                    ref={avatarRef}
+                    defaultText={expressInput}
+                    showControls
+                    minHeight={440}
+                  />
 
                   {signApiError && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4">
@@ -684,14 +597,13 @@ export default function SignPage() {
 
         {/* ── Right Sidebar ── */}
         <aside className="w-80 shrink-0 hidden lg:flex flex-col gap-6">
-          {/* Daily Tip — intentionally styled with purple accent */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-purple-400/15 dark:border-purple-500/20"
+            className="surface-card p-6 rounded-[var(--radius-lg)] relative overflow-hidden border border-[var(--brand-primary)]/15 dark:border-[var(--brand-primary)]/20"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-4 flex items-center gap-2">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--brand-primary)]/10 rounded-full blur-2xl -mr-10 -mt-10" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--brand-primary)] dark:text-[var(--brand-primary)] mb-4 flex items-center gap-2">
               <BookOpen className="w-3 h-3" /> Daily Context
             </p>
             <div className="text-3xl mb-3 drop-shadow-lg">{currentTip.icon}</div>
@@ -702,24 +614,24 @@ export default function SignPage() {
                 <button
                   key={i}
                   onClick={() => setTipIndex(i)}
-                  className={cn("h-1.5 rounded-full transition-all duration-300", i === tipIndex ? "w-8 bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "w-2 bg-[var(--panel-border)] hover:bg-[var(--text-muted)]")}
+                  className={cn("h-1.5 rounded-full transition-all duration-300", i === tipIndex ? "w-8 bg-[var(--brand-primary)]" : "w-2 bg-[var(--panel-border)] hover:bg-[var(--text-muted)]")}
                 />
               ))}
             </div>
           </motion.div>
 
           {/* Common Phrases */}
-          <div className="glass-panel p-6 rounded-3xl">
+          <div className="surface-card p-6 rounded-[var(--radius-lg)]">
             <h3 className="font-bold text-[var(--foreground)] mb-5 text-sm uppercase tracking-widest">Common Phrases</h3>
             <div className="space-y-3">
-              {COMMON_PHRASES.slice(0, 4).map((phrase, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--panel-border)] hover:border-purple-400/25 dark:hover:border-purple-500/30 transition-all group">
+              {COMMON_PHRASES.map((phrase, i) => (
+                <div key={i} className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--panel-border)] hover:border-[var(--brand-primary)]/25 dark:hover:border-[var(--brand-primary)]/30 transition-all group">
                   <p className="text-sm font-bold text-[var(--foreground)] mb-1">{phrase.english}</p>
                   <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-3">{phrase.asl_note}</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => animateAvatar(phrase.english)}
-                      className="text-[9px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2.5 py-1.5 rounded flex items-center gap-1.5 hover:bg-purple-500/20 transition-colors"
+                      className="text-[9px] font-bold uppercase tracking-widest text-[var(--brand-primary)] dark:text-[var(--brand-primary)] bg-[var(--brand-primary)]/10 px-2.5 py-1.5 rounded flex items-center gap-1.5 hover:bg-[var(--brand-primary-hover)]/20 transition-colors"
                     >
                       <PlayCircle className="w-3 h-3" /> Play
                     </button>
@@ -734,162 +646,11 @@ export default function SignPage() {
                   </div>
                 </div>
               ))}
-              <button
-                onClick={() => setIsLibraryOpen(true)}
-                className="w-full py-3 rounded-2xl border border-dashed border-[var(--panel-border)] text-[var(--text-muted)] hover:text-purple-500 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2"
-              >
-                <Search className="w-3 h-3" /> See More (500+)
-              </button>
             </div>
           </div>
         </aside>
       </div>
-
-      {/* ── Phrase Library Modal ── */}
-      <AnimatePresence>
-        {isLibraryOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsLibraryOpen(false)}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
-            />
-            
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative z-10 glass-panel w-full max-w-4xl max-h-[85vh] rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl border-white/10"
-            >
-              {/* Modal Header */}
-              <div className="px-8 pt-8 pb-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black text-white flex items-center gap-3">
-                    <BookOpen className="w-6 h-6 text-purple-500" /> Phrase Library
-                    <span className="text-xs font-bold bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full border border-purple-500/30 ml-2">500+ Items</span>
-                  </h2>
-                  <p className="text-slate-400 text-sm mt-1">Browse common expressions and academic terms</p>
-                </div>
-                <button 
-                  onClick={() => setIsLibraryOpen(false)}
-                  className="p-2 bg-white/5 rounded-full text-slate-400 hover:text-white transition-colors self-start sm:self-center"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Filters Box */}
-              <div className="bg-white/5 px-8 py-4 flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 w-full">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search phrases..."
-                    value={librarySearch}
-                    onChange={(e) => setLibrarySearch(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                  />
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-                  <Filter className="w-4 h-4 text-slate-500 mr-2 shrink-0" />
-                  {["all", "ACADEMIC", "DAILY", "SIGN", "CAMPUS", "HEALTH", "SHOPPING"].map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setLibraryCategory(cat)}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border",
-                        libraryCategory === cat
-                          ? "bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20"
-                          : "bg-white/5 border-white/5 text-slate-400 hover:text-slate-200"
-                      )}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                {libraryLoading ? (
-                  <div className="h-64 flex flex-col items-center justify-center gap-4">
-                    <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Loading seeded library...</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {libraryPhrases
-                      .filter(p => {
-                        const matchesSearch = p.source.toLowerCase().includes(librarySearch.toLowerCase());
-                        const category = (p.extra as any).category || "DAILY";
-                        const matchesCategory = libraryCategory === "all" || category === libraryCategory;
-                        return matchesSearch && matchesCategory;
-                      })
-                      .map((phrase) => (
-                        <div key={phrase.id} className="group p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] hover:border-purple-500/30 transition-all flex flex-col justify-between text-left">
-                          <div className="mb-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-purple-400">
-                                {(phrase.extra as any).category || "DAILY"}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <History className="w-3 h-3 text-slate-600" />
-                                <span className="text-[9px] text-slate-500 font-bold uppercase">{phrase.targetLang}</span>
-                              </div>
-                            </div>
-                            <p className="text-white font-bold text-base group-hover:text-purple-200 transition-colors">{phrase.source}</p>
-                            <p className="text-slate-400 text-xs mt-1 italic leading-relaxed">"{phrase.result.cultural_note}"</p>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 mt-2">
-                            <button
-                              onClick={() => { animateAvatar(phrase.source); setIsLibraryOpen(false); }}
-                              className="flex-1 bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/30 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                            >
-                              <PlayCircle className="w-4 h-4" /> Play
-                            </button>
-                            <button
-                              onClick={async (e) => {
-                                const btn = e.currentTarget;
-                                btn.disabled = true;
-                                try {
-                                  await savePhrasebookEntry(phrase.id);
-                                  const iconContainer = btn.querySelector('.save-icon');
-                                  if (iconContainer) iconContainer.innerHTML = 'Saved';
-                                  setTimeout(() => { if (iconContainer) iconContainer.innerHTML = ''; btn.disabled = false; }, 2000);
-                                } catch { 
-                                  btn.disabled = false;
-                                }
-                              }}
-                              className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
-                              title="Save to Phrasebook"
-                            >
-                              <Bookmark className="w-4 h-4" />
-                              <span className="save-icon text-[9px] font-bold uppercase"></span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    {libraryPhrases.length > 0 && libraryPhrases.some(p => p.source.toLowerCase().includes(librarySearch.toLowerCase())) === false && (
-                      <div className="col-span-full py-20 text-center">
-                        <Search className="w-12 h-12 text-slate-800 mx-auto mb-4" />
-                        <p className="text-slate-500 font-medium">No phrases found matching "{librarySearch}"</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="px-8 py-6 bg-slate-900/50 border-t border-white/5 text-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">TraduMust Accessibility Library &copy; 2024</p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
