@@ -58,6 +58,13 @@ public/asl-avatar/cwa/cwasa.css
 public/asl-avatar/cwa/cwacfg.json
 public/asl-avatar/avatars/
 
+# --- Extension bundled CWASA (run npm run extension:cwasa) ---
+extension/3d/cwa/allcsa.js
+extension/3d/cwa/cwasa.css
+extension/3d/cwa/cwacfg.json
+extension/3d/avatars/
+extension/3d/cwasa-bundle.json
+
 # --- Scrape / temp ---
 .firecrawl/
 .tmp/

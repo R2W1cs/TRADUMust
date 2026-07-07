@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D ASL Avatar</title>
-  <link rel="stylesheet" href="https://3dasl-avatar.vercel.app/cwa/cwasa.css" id="cwasa-css" />
+  <link rel="stylesheet" href="cwa/cwasa.css" id="cwasa-css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
@@ -14,7 +14,7 @@
     .CWASAAvMenu { display: none !important; }
     .controls { display: none; }
     #sb-status {
-      display: none;
+      display: flex;
       position: absolute;
       inset: 0;
       align-items: center;
@@ -32,15 +32,17 @@
     <div class="avatar-wrap">
       <div class="CWASAAvatar av0" align="center"></div>
       <div class="CWASAAvMenu av0"></div>
-      <div id="sb-status">Loading 3D avatar…</div>
+      <div id="sb-status">Loading offline 3D avatar…</div>
     </div>
     <input type="hidden" id="glossInput" />
   </div>
   <script>
     (function () {
       const REMOTE = "https://3dasl-avatar.vercel.app";
+      const LOCAL_ROOT = new URL("./", window.location.href).href;
       const VALID_AVATARS = ["anna", "marc", "francoise"];
-      let SIGML_BASE = REMOTE + "/sigml/";
+      let SIGML_BASE = LOCAL_ROOT + "sigml/asl/";
+      let SIGML_REMOTE = REMOTE + "/sigml/";
       let playingTimeout = null;
       let stopRequested = false;
       let cwasaReady = false;
@@ -48,7 +50,7 @@
       const statusEl = document.getElementById("sb-status");
       const css = document.getElementById("cwasa-css");
 
-      window.__CWASA_ASSET_ROOT__ = REMOTE + "/";
+      window.__CWASA_ASSET_ROOT__ = LOCAL_ROOT;
       window.__CWASA_SIGML_BASE__ = SIGML_BASE;
 
       css.onerror = function () {
@@ -77,7 +79,7 @@
         el.onload = function () { bootCwasa(); };
         el.onerror = function () {
           if (fallback) loadScript(fallback, null);
-          else notifyError("CWASA failed to load");
+          else notifyError("CWASA failed to load — run npm run extension:cwasa");
         };
         document.body.appendChild(el);
       }
@@ -103,12 +105,10 @@
           notifyError("CWASA runtime missing");
           return;
         }
-        SIGML_BASE = window.__CWASA_SIGML_BASE__ || SIGML_BASE;
-        const assetRoot = window.__CWASA_ASSET_ROOT__ || REMOTE + "/";
 
         CWASA.init({
-          jasBase: assetRoot,
-          cwaBase: assetRoot + "cwa/",
+          jasBase: LOCAL_ROOT,
+          cwaBase: LOCAL_ROOT + "cwa/",
           useClientConfig: true,
           useCwaConfig: true,
           avSettings: [{
@@ -134,17 +134,31 @@
         }
       }
 
-      loadScript(REMOTE + "/cwa/allcsa.js", null);
+      loadScript(LOCAL_ROOT + "cwa/allcsa.js", REMOTE + "/cwa/allcsa.js");
 
       function playSiGML(sigmlURL) { CWASA.playSiGMLURL(sigmlURL); }
 
-      function isValidGloss(gloss) {
+      function glossUrl(base, gloss) {
+        return base + encodeURI(gloss) + ".sigml";
+      }
+
+      function isValidGlossAt(base, gloss) {
         let ok = false;
         const req = new XMLHttpRequest();
-        req.open("HEAD", SIGML_BASE + encodeURI(gloss) + ".sigml", false);
+        req.open("HEAD", glossUrl(base, gloss), false);
         req.onload = function () { ok = req.status === 200; };
         try { req.send(); } catch (e) { ok = false; }
         return ok;
+      }
+
+      function isValidGloss(gloss) {
+        if (isValidGlossAt(SIGML_BASE, gloss)) return true;
+        return isValidGlossAt(SIGML_REMOTE, gloss);
+      }
+
+      function resolveGlossUrl(gloss) {
+        if (isValidGlossAt(SIGML_BASE, gloss)) return glossUrl(SIGML_BASE, gloss);
+        return glossUrl(SIGML_REMOTE, gloss);
       }
 
       function findGlosses(input) {
@@ -154,21 +168,26 @@
           let matched = false;
           for (let len = Math.min(3, words.length - i); len >= 1; len--) {
             const potential = words.slice(i, i + len).join(" ");
-            if (isValidGloss(potential)) {
-              glosses.push(potential);
+            const upper = potential.toUpperCase().replace(/ /g, "_");
+            if (isValidGloss(potential) || isValidGloss(upper)) {
+              glosses.push(isValidGloss(upper) ? upper : potential);
               i += len - 1;
               matched = true;
               break;
             }
           }
-          if (!matched && isValidGloss(words[i])) glosses.push(words[i]);
+          if (!matched) {
+            const upper = words[i].toUpperCase().replace(/ /g, "_");
+            if (isValidGloss(words[i])) glosses.push(words[i]);
+            else if (isValidGloss(upper)) glosses.push(upper);
+          }
         }
         return glosses;
       }
 
       function playGlossesSequentially(glosses, index) {
         if (index >= glosses.length || stopRequested) return;
-        playSiGML(SIGML_BASE + encodeURI(glosses[index]) + ".sigml");
+        playSiGML(resolveGlossUrl(glosses[index]));
         playingTimeout = setTimeout(() => playGlossesSequentially(glosses, index + 1), 1650);
       }
 

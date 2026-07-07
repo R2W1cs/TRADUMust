@@ -82,7 +82,6 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' https://3dasl-avatar.vercel.app; style-src 'self' https://3dasl-avatar.vercel.app; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com https://3dasl-avatar.vercel.app; object-src 'self'"
   },
-
   "web_accessible_resources": [
     {
       "resources": [
@@ -91,6 +90,12 @@
         "content/vocab-10k.json",
         "3d/cwasa-embed.html",
         "3d/cwaclientcfg.json",
+        "3d/cwasa-bundle.json",
+        "3d/cwa/*",
+        "3d/cwa/shaders/*",
+        "3d/avatars/*",
+        "3d/sigml/asl/*",
+        "3d/gloss-index.json",
         "3d/avatar3d.html",
         "3d/avatar3d.js",
         "3d/pose-library.js",
