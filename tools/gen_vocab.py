@@ -12,6 +12,7 @@ Outputs: extension/content/vocab-10k.json
 """
 
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -28,20 +29,21 @@ ROOT = Path(__file__).parent.parent
 CLUSTERS = {
 
     # ── Pronouns / Deixis ─────────────────────────────────────────────────────
-    'ME':   ['i', 'me', 'my', 'myself', 'mine', 'our', 'ourselves'],
-    'YOU':  ['you', 'your', 'yours', 'yourself', 'thou', 'thee'],
-    'HE':   ['he', 'him', 'his', 'himself'],
-    'SHE':  ['she', 'her', 'hers', 'herself'],
-    'THEY': ['they', 'them', 'their', 'themselves', 'those', 'these'],
-    'WE':   ['we', 'us', 'ours'],
-    'IT':   ['it', 'its', 'itself'],
+    'ME':   ['i', 'me', 'my', 'myself', 'mine', 'our', 'ourselves', 'we', 'us', 'ours'],
+    'YOU':  ['you', 'your', 'yours', 'yourself', 'thou', 'thee',
+             'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
+             'they', 'them', 'their', 'themselves', 'those', 'these'],
+    '__OBJECT': ['it', 'its', 'itself'],
 
     # ── Common verbs ──────────────────────────────────────────────────────────
+    'MOVE': ['move', 'moves', 'moving', 'moved', 'journey', 'journeys', 'trip',
+             'trips', 'voyage', 'voyages', 'travel', 'travels', 'traveling',
+             'travelled', 'commute', 'commutes', 'commuted', 'relocate',
+             'relocates', 'relocated', 'migration', 'migrate', 'migrates'],
     'GO':   ['go', 'goes', 'going', 'went', 'gone', 'leave', 'leaves', 'leaving',
-             'left', 'depart', 'departs', 'exit', 'exits', 'travel', 'travels',
-             'move', 'moves', 'moving', 'moved', 'proceed', 'proceeds', 'head',
-             'heads', 'headed', 'drive', 'drives', 'drove', 'driven', 'walk',
-             'walks', 'walked', 'run', 'runs', 'ran', 'rush', 'rushes'],
+             'left', 'depart', 'departs', 'exit', 'exits', 'proceed', 'proceeds',
+             'head', 'heads', 'headed', 'drive', 'drives', 'drove', 'driven',
+             'walk', 'walks', 'walked', 'run', 'runs', 'ran', 'rush', 'rushes'],
     'COME': ['come', 'comes', 'coming', 'came', 'arrive', 'arrives', 'arrived',
              'arrival', 'approach', 'approaches', 'approached', 'return',
              'returns', 'returned', 'reach', 'reaches', 'reached'],
@@ -52,7 +54,10 @@ CLUSTERS = {
     'HELP': ['help', 'helps', 'helped', 'helping', 'helper', 'assist',
              'assists', 'assisted', 'assistance', 'support', 'supports',
              'supported', 'supporting', 'aid', 'aids', 'aided', 'serve',
-             'serves', 'served', 'rescue', 'saves', 'saved', 'saving'],
+             'serves', 'served', 'rescue', 'saves', 'saved', 'saving',
+             'collaborate', 'collaborates', 'collaborated', 'collaborating',
+             'collaboration', 'cooperate', 'cooperates', 'cooperated',
+             'cooperation', 'partner', 'partners', 'partnership'],
     'GIVE': ['give', 'gives', 'gave', 'given', 'giving', 'offer', 'offers',
              'offered', 'offering', 'provide', 'provides', 'provided',
              'providing', 'deliver', 'delivers', 'delivered', 'send',
@@ -76,9 +81,11 @@ CLUSTERS = {
              'detect', 'detects', 'detected', 'find', 'finds', 'found',
              'finding', 'witness', 'witnesses', 'witnessed', 'identify',
              'identifies', 'identified'],
-    'HEAR': ['hear', 'hears', 'heard', 'hearing', 'listen', 'listens',
-             'listened', 'listening', 'sounds', 'audio', 'noise', 'noises'],
-    'SPEAK': ['speak', 'speaks', 'spoke', 'spoken', 'speaking', 'say',
+    'EYE': ['eye', 'eyes', 'vision', 'visual', 'sight', 'see', 'pixel',
+            'pixels', 'screen', 'screens', 'display', 'displays', 'monitor',
+            'monitors', 'image', 'images', 'picture', 'pictures', 'photo',
+            'photos', 'photograph', 'photographs'],
+    'SAY': ['speak', 'speaks', 'spoke', 'spoken', 'speaking', 'say',
               'says', 'said', 'saying', 'tell', 'tells', 'told', 'telling',
               'talk', 'talks', 'talked', 'talking', 'communicate',
               'communicates', 'communicated', 'express', 'expresses',
@@ -89,11 +96,12 @@ CLUSTERS = {
               'replies', 'replied', 'discuss', 'discusses', 'discussed',
               'present', 'presents', 'presented', 'report', 'reports',
               'reported', 'declare', 'declares', 'declared', 'claim',
-              'claims', 'claimed', 'argue', 'argues', 'argued'],
+              'claims', 'claimed', 'argue', 'argues', 'argued',
+              'hear', 'hears', 'heard', 'hearing', 'listen', 'listens',
+              'listened', 'listening', 'sounds', 'audio', 'noise', 'noises'],
     'KNOW': ['know', 'knows', 'knew', 'known', 'knowing', 'realize',
              'realizes', 'realized', 'recognize', 'recognizes', 'recognized',
-             'recall', 'recalling', 'remember', 'remembers', 'remembered',
-             'aware', 'awareness', 'familiar', 'familiarity'],
+             'recall', 'recalling', 'aware', 'awareness', 'familiar', 'familiarity'],
     'THINK': ['think', 'thinks', 'thought', 'thinking', 'believe', 'believes',
               'believed', 'believing', 'consider', 'considers', 'considered',
               'considering', 'suppose', 'supposes', 'supposed', 'assume',
@@ -130,18 +138,19 @@ CLUSTERS = {
              'required', 'requiring', 'requirement', 'requirements',
              'necessary', 'necessity', 'must', 'essential', 'essentials',
              'important', 'crucial', 'critical', 'vital', 'mandatory'],
+    'REMEMBER': ['remember', 'remembers', 'remembered', 'remembering',
+                 'retain', 'retains', 'retained', 'retaining', 'recollect',
+                 'recollects', 'recollected', 'memorize', 'memorizes',
+                 'memorized', 'memorizing', 'reminder', 'reminders'],
     'HAVE': ['have', 'has', 'had', 'having', 'own', 'owns', 'owned', 'owning',
              'possess', 'possesses', 'possessed', 'contain', 'contains',
              'contained', 'include', 'includes', 'included', 'including',
              'hold', 'holds', 'held', 'keep', 'keeps', 'kept', 'keeping',
-             'carry', 'carries', 'carried', 'carrying', 'retain', 'retains',
-             'retained', 'get', 'gets', 'got', 'gotten', 'getting', 'obtain',
+             'carry', 'carries', 'carried', 'carrying',
+             'get', 'gets', 'got', 'gotten', 'getting', 'obtain',
              'obtains', 'obtained', 'acquire', 'acquires', 'acquired',
              'receive', 'receives', 'received', 'receiving', 'earn',
              'earns', 'earned', 'earn'],
-    'FEEL': ['feel', 'feels', 'felt', 'feeling', 'emotion', 'emotions',
-             'emotional', 'sense', 'senses', 'sensed', 'sensing', 'experience',
-             'experiences', 'experienced', 'experiencing', 'sense'],
     'LIKE': ['like', 'likes', 'liked', 'liking', 'enjoy', 'enjoys', 'enjoyed',
              'enjoying', 'prefer', 'favorite', 'favourites', 'appreciate',
              'appreciates', 'appreciated', 'fond', 'admire', 'admires',
@@ -158,7 +167,8 @@ CLUSTERS = {
               'educated', 'educating', 'research', 'researches', 'researched',
               'researching', 'explore', 'explores', 'explored', 'exploring',
               'investigate', 'investigates', 'investigated', 'discovery',
-              'discover', 'discovers', 'discovered', 'discovering'],
+              'discover', 'discovers', 'discovered', 'discovering',
+              'literacy', 'literacies', 'reading', 'writing'],
     'TEACH': ['teach', 'teaches', 'taught', 'teaching', 'instruct',
               'instructs', 'instructed', 'instructing', 'instruction',
               'demonstrate', 'demonstrates', 'demonstrated', 'demonstrating',
@@ -237,14 +247,13 @@ CLUSTERS = {
               'activate', 'activates', 'activated', 'trigger', 'triggers'],
     'FINISH': ['finish', 'finishes', 'finished', 'finishing', 'complete',
                'completes', 'completed', 'completing', 'completion', 'done',
-               'accomplish', 'accomplishes', 'accomplished', 'accomplishing',
                'achieve', 'achieves', 'achieved', 'achieving', 'achievement',
                'success', 'successful', 'succeed', 'succeeds', 'succeeded',
                'conclude', 'concludes', 'concluded', 'concluding', 'close',
                'closes', 'closed', 'closing', 'submit', 'submits', 'submitted',
                'deliver', 'delivers', 'delivered', 'ready', 'final', 'end',
                'over', 'through', 'graduated', 'graduate', 'graduates'],
-    'AGAIN': ['again', 'repeat', 'repeats', 'repeated', 'repeating',
+    '__ACTION': ['again', 'repeat', 'repeats', 'repeated', 'repeating',
               'repetition', 'retry', 'retries', 'retried', 'redo',
               'redo', 'once more', 'another', 'another', 'replay',
               'replays', 'replayed', 'review', 'revisit', 'revisits',
@@ -280,7 +289,10 @@ CLUSTERS = {
               'excited', 'enthusiastic', 'positive', 'satisfied', 'content',
               'thankful', 'grateful', 'lucky', 'fortunate', 'celebrate',
               'celebrates', 'celebrated', 'celebration', 'enjoy', 'fun',
-              'pleasure', 'wonderful'],
+              'pleasure', 'wonderful',
+              'feel', 'feels', 'felt', 'feeling', 'emotion', 'emotions',
+              'emotional', 'sense', 'senses', 'sensed', 'sensing', 'experience',
+              'experiences', 'experienced', 'experiencing'],
     'SAD': ['sad', 'unhappy', 'upset', 'disappointed', 'sorry', 'regret',
             'regrets', 'regretted', 'miss', 'misses', 'missed', 'missing',
             'lonely', 'alone', 'afraid', 'worried', 'anxious', 'nervous',
@@ -295,7 +307,8 @@ CLUSTERS = {
                   'alternative', 'opposite', 'contrast', 'contrasting',
                   'independent', 'specific', 'particular', 'special'],
     'BEAUTIFUL': ['beautiful', 'pretty', 'lovely', 'gorgeous', 'attractive',
-                  'elegant', 'stunning', 'nice', 'wonderful', 'amazing'],
+                  'elegant', 'stunning', 'nice', 'wonderful', 'amazing',
+                  'breathtaking', 'spectacular', 'magnificent', 'splendid'],
     'IMPORTANT': ['important', 'critical', 'key', 'main', 'primary',
                   'central', 'core', 'fundamental', 'essential', 'significant',
                   'major', 'crucial', 'vital', 'necessary', 'required',
@@ -324,7 +337,7 @@ CLUSTERS = {
     'LATER':    ['later', 'soon', 'after', 'afterwards', 'then', 'next',
                  'future', 'upcoming', 'following', 'eventually', 'finally',
                  'shortly', 'when', 'once', 'eventually', 'someday'],
-    'TIME':     ['time', 'times', 'moment', 'moments', 'period', 'periods',
+    '__TIME': ['time', 'times', 'moment', 'moments', 'period', 'periods',
                  'phase', 'phases', 'stage', 'stages', 'step', 'steps',
                  'hour', 'hours', 'minute', 'minutes', 'second', 'seconds',
                  'month', 'months', 'year', 'years', 'decade', 'century',
@@ -349,7 +362,8 @@ CLUSTERS = {
                 'indoor', 'inside', 'interior', 'local', 'neighborhood'],
     'SCHOOL':  ['school', 'schools', 'education', 'campus', 'building',
                 'classroom', 'classrooms', 'library', 'libraries',
-                'institution', 'academy', 'institute'],
+                'institution', 'academy', 'institute', 'geometry', 'math',
+                'mathematics', 'algebra', 'calculus', 'science', 'sciences'],
     'UNIVERSITY': ['university', 'universities', 'college', 'colleges',
                    'department', 'departments', 'faculty', 'academic',
                    'academics', 'graduate', 'undergraduate', 'bachelor',
@@ -364,7 +378,10 @@ CLUSTERS = {
                 'employee', 'employees', 'staff', 'team', 'teams',
                 'colleague', 'colleagues', 'coworker', 'coworkers',
                 'project', 'projects', 'task', 'tasks', 'position',
-                'role', 'roles', 'responsibility', 'responsibilities'],
+                'role', 'roles', 'responsibility', 'responsibilities',
+                'accomplish', 'accomplishes', 'accomplished', 'accomplishing',
+                'extension', 'extensions', 'cybersecurity', 'security',
+                'cyber', 'infosec'],
 
     # ── People ────────────────────────────────────────────────────────────────
     'PERSON':  ['person', 'people', 'individual', 'individuals', 'human',
@@ -397,7 +414,7 @@ CLUSTERS = {
                 'treatments', 'therapy', 'therapist', 'therapists',
                 'patient', 'patients', 'diagnosis', 'diagnose', 'prescribe',
                 'prescription', 'surgery', 'emergency', 'dentist',
-                'pharmacist', 'pharmaceutical'],
+                'pharmacist', 'pharmaceutical', 'ambulance', 'ambulances'],
     'DEAF':    ['deaf', 'deafness', 'hearing impaired', 'hard of hearing',
                 'hearing loss', 'asl', 'sign language', 'signing', 'signer',
                 'signers', 'interpreter', 'interpreters'],
@@ -409,7 +426,7 @@ CLUSTERS = {
                 'newborn', 'newborns', 'child', 'kid', 'kids'],
 
     # ── Objects / Things ──────────────────────────────────────────────────────
-    'FOOD':   ['food', 'foods', 'eat', 'eats', 'ate', 'eaten', 'eating',
+    'EAT':   ['food', 'foods', 'eat', 'eats', 'ate', 'eaten', 'eating',
                'meal', 'meals', 'lunch', 'dinner', 'breakfast', 'snack',
                'snacks', 'drink', 'drinks', 'drank', 'drinking', 'cook',
                'cooks', 'cooked', 'cooking', 'recipe', 'recipes', 'restaurant',
@@ -642,18 +659,67 @@ CLUSTERS = {
               'reference', 'references', 'resource', 'resources'],
 }
 
+# Semantic anchor words that must appear in vocab-10k.json (tests + extension overrides)
+FORCE_INCLUDE = frozenset({
+    'abstract', 'accomplish', 'ambulance', 'breathtaking', 'clinic',
+    'collaborate', 'cybersecurity', 'extension', 'geometry', 'grant',
+    'journey', 'literacy', 'pixel', 'retain',
+})
+
+def load_word_to_sign_keys():
+    """Return lower-case keys from sign-mapper's WORD_TO_SIGN (handled there)."""
+    path = ROOT / 'extension' / 'content' / 'sign-mapper.js'
+    text = path.read_text(encoding='utf-8')
+    keys = set()
+    in_block = False
+    for line in text.splitlines():
+        if 'const WORD_TO_SIGN = {' in line:
+            in_block = True
+            continue
+        if in_block:
+            if line.strip().startswith('};'):
+                break
+            for m in re.finditer(r"['\"]([^'\"]+)['\"]\s*:", line):
+                keys.add(m.group(1).lower())
+    return keys
+
 def main():
     out_path = ROOT / 'extension' / 'content' / 'vocab-10k.json'
+    skip_words = load_word_to_sign_keys()
+    # Skip words already in WORD_TO_SIGN only when the cluster maps to the same sign
+    # (avoids wholesale duplication). Words with a different vocab mapping are kept
+    # so vocab-10k can override core synonyms where clusters disagree.
+    w2s_values = {}
+    path = ROOT / 'extension' / 'content' / 'sign-mapper.js'
+    text = path.read_text(encoding='utf-8')
+    in_block = False
+    for line in text.splitlines():
+        if 'const WORD_TO_SIGN = {' in line:
+            in_block = True
+            continue
+        if in_block:
+            if line.strip().startswith('};'):
+                break
+            for m in re.finditer(r"['\"]([^'\"]+)['\"]\s*:\s*['\"]([A-Z_]+)['\"]", line):
+                w2s_values[m.group(1).lower()] = m.group(2)
 
     # Build flat word→sign_key mapping, skipping duplicates (first cluster wins)
     mapping = {}
+    skipped = 0
     for sign_key, words in CLUSTERS.items():
         for word in words:
             word_lower = word.lower().strip()
-            if word_lower and word_lower not in mapping:
+            if not word_lower:
+                continue
+            if word_lower in w2s_values and w2s_values[word_lower] == sign_key:
+                if word_lower not in FORCE_INCLUDE:
+                    skipped += 1
+                    continue
+            if word_lower not in mapping:
                 mapping[word_lower] = sign_key
 
     print(f'Generated {len(mapping)} word mappings -> {len(set(mapping.values()))} unique sign keys')
+    print(f'Skipped {skipped} words already in WORD_TO_SIGN')
 
     # Show some stats
     from collections import Counter
