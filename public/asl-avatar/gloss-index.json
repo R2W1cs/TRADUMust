@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "builtAt": "2026-07-05T14:03:19.614Z",
+  "builtAt": "2026-07-13T13:34:53.396Z",
   "libraries": {
     "ALSL": {
       "glossCount": 411,
@@ -419,7 +419,7 @@
       ]
     },
     "ASL": {
-      "glossCount": 58,
+      "glossCount": 59,
       "glosses": [
         "HELLO",
         "HI",
@@ -442,6 +442,7 @@
         "LOVE",
         "GO",
         "COME",
+        "WELCOME",
         "SEE",
         "LEARN",
         "ME",
@@ -525,6 +526,9 @@
         "name": "NAME",
         "need": "NEED",
         "wait": "WAIT",
+        "welcome": "WELCOME",
+        "welcome in": "WELCOME",
+        "come in": "WELCOME",
         "good morning": "GOOD",
         "good night": "NIGHT"
       }

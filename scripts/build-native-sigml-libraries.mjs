@@ -38,6 +38,7 @@ const ASL_SIGML = {
   LOVE: `<sigml><hamgestural_sign gloss="LOVE"><sign_manual><handconfig handshape="fist" thumbpos="across"/><handconfig extfidir="ol"/><handconfig palmor="l"/><location_bodyarm location="chest"/><par_motion><directedmotion direction="c" curve="c"/></par_motion></sign_manual></hamgestural_sign></sigml>`,
   GO: `<sigml><hamgestural_sign gloss="GO"><sign_manual><handconfig handshape="flat" thumbpos="out"/><handconfig extfidir="ol"/><handconfig palmor="d"/><location_bodyarm location="chest"/><directedmotion direction="o" curve="o"/></sign_manual></hamgestural_sign></sigml>`,
   COME: `<sigml><hamgestural_sign gloss="COME"><sign_manual><handconfig handshape="finger2" thumbpos="across"/><handconfig extfidir="il"/><handconfig palmor="u"/><location_bodyarm location="chest"/><directedmotion direction="i" curve="i"/></sign_manual></hamgestural_sign></sigml>`,
+  WELCOME: `<sigml><hamgestural_sign gloss="WELCOME"><sign_manual><handconfig handshape="flat" thumbpos="out"/><handconfig extfidir="ol"/><handconfig palmor="u"/><location_bodyarm location="chest"/><directedmotion direction="i" curve="i"/></sign_manual></hamgestural_sign></sigml>`,
   SEE: `<sigml><hamgestural_sign gloss="SEE"><sign_manual><handconfig handshape="finger2" thumbpos="across"/><handconfig extfidir="il"/><handconfig palmor="r"/><location_bodyarm location="eyes"/><directedmotion direction="o" curve="o"/></sign_manual></hamgestural_sign></sigml>`,
   LEARN: `<sigml><hamgestural_sign gloss="LEARN"><sign_manual><handconfig handshape="flat" thumbpos="out"/><handconfig extfidir="ol"/><handconfig palmor="u"/><location_bodyarm location="palm"/><directedmotion direction="u" curve="u"/><location_bodyarm location="forehead"/></sign_manual></hamgestural_sign></sigml>`,
   ME: `<sigml><hamgestural_sign gloss="ME"><sign_manual><handconfig handshape="finger2" thumbpos="across"/><handconfig extfidir="il"/><handconfig palmor="l"/><location_bodyarm location="chest"/></sign_manual></hamgestural_sign></sigml>`,
@@ -86,6 +87,7 @@ const ENGLISH_TO_ASL = {
   go: "GO", come: "COME", see: "SEE", learn: "LEARN", me: "ME", i: "ME", my: "ME",
   you: "YOU", your: "YOU", good: "GOOD", well: "FINE", fine: "FINE", okay: "GOOD", ok: "GOOD",
   morning: "MORNING", night: "NIGHT", name: "NAME", need: "NEED", wait: "WAIT",
+  welcome: "WELCOME", "welcome in": "WELCOME", "come in": "WELCOME",
   "good morning": "GOOD", "good night": "NIGHT",
 };
 

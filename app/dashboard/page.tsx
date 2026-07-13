@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   HandMetal, GraduationCap, ArrowRight, TrendingUp, Clock, Star,
-  Loader2, Flame, Target, BookOpen, Zap,
+  Loader2, Flame, Target, BookOpen, Zap, BarChart3,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useProgressStats } from "@/lib/hooks/useProgress";
@@ -28,11 +29,14 @@ const TIPS = [
 export default function DashboardPage() {
   const token = useAppSelector((s) => s.auth.token);
   const { user } = useAppSelector((s) => s.auth);
-  const { xp, lessonsDone, streak, level, achievements, badges, isLoading: progressLoading } = useProgressStats();
+  const {
+    xp, lessonsDone, streak, level, achievements, badges,
+    lessonProgress, isLoading: progressLoading,
+  } = useProgressStats();
 
   const { data: historyData, isLoading: historyLoading } = useQuery({
-    queryKey: ["history-recent"],
-    queryFn: () => historyApi.list({ page: 1 }),
+    queryKey: ["history-dashboard"],
+    queryFn: () => historyApi.list({ page: 1, limit: 100 }),
     enabled: !!token,
   });
 
@@ -42,8 +46,11 @@ export default function DashboardPage() {
     enabled: !!token,
   });
 
-  const translationCount = historyData?.total ?? 0;
   const recentItems = historyData?.items?.slice(0, 5) ?? [];
+  const chartHistory = historyData?.items ?? [];
+  const chartLessons = lessonProgress.length
+    ? lessonProgress
+    : progressData?.lessonProgress ?? [];
   const dailyGoal = 50;
   const dailyProgress = Math.min(xp % dailyGoal, dailyGoal);
   const tipOfDay = TIPS[new Date().getDate() % TIPS.length];
@@ -51,7 +58,6 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="w-full space-y-8">
-        {/* Hero banner — no surface-card (it forces white bg and hides text-white in light mode) */}
         <div className="rounded-[var(--radius-lg)] p-6 md:p-8 bg-gradient-to-r from-[var(--brand-secondary)] to-[var(--brand-primary)] text-white shadow-[0_4px_16px_var(--shadow-color)] border border-[var(--brand-primary)]/20">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -60,7 +66,7 @@ export default function DashboardPage() {
                 {user?.name ? `${user.name.split(" ")[0]}'s workspace` : "TRADUMUST"}
               </h1>
               <p className="mt-2 opacity-90 max-w-md">
-                Translate, learn, and track your sign language progress — all in one place.
+                Your learning stats, translation activity, and progress charts — all in one place.
               </p>
             </div>
             <Button href="/learn" className="bg-white text-[var(--brand-primary)] hover:bg-white/90 border-white shrink-0">
@@ -69,7 +75,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "XP", value: progressLoading ? "—" : xp, icon: Zap, color: "text-[var(--brand-primary)]" },
@@ -85,8 +90,39 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        <section aria-labelledby="charts-heading" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-[var(--brand-primary)]" aria-hidden />
+            <h2 id="charts-heading" className="text-lg font-semibold text-[var(--foreground)]">
+              Analytics
+            </h2>
+          </div>
+
+          {!token ? (
+            <Card padding="md">
+              <p className="text-sm text-[var(--text-secondary)]">
+                <Link href="/login" className="font-medium text-[var(--brand-primary)] hover:underline">
+                  Sign in
+                </Link>{" "}
+                to unlock weekly activity charts, language breakdown, and lesson analytics.
+              </p>
+            </Card>
+          ) : historyLoading || progressLoading ? (
+            <Card padding="md" className="flex min-h-[200px] items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-primary)]" />
+            </Card>
+          ) : (
+            <DashboardCharts
+              historyItems={chartHistory}
+              lessonProgress={chartLessons}
+              xp={xp}
+              level={level}
+              streak={streak}
+            />
+          )}
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Daily goal */}
           <Card padding="md" className="lg:col-span-1">
             <h2 className="font-semibold flex items-center gap-2 mb-4 text-[var(--foreground)]">
               <Target className="w-5 h-5 text-[var(--brand-primary)]" /> Daily goal
@@ -97,20 +133,18 @@ export default function DashboardPage() {
                 style={{ width: `${(dailyProgress / dailyGoal) * 100}%` }}
               />
             </div>
-            <p className="text-sm text-[var(--text-secondary)]">{dailyProgress} / {dailyGoal} XP today</p>
+            <p className="text-sm text-[var(--text-secondary)]">{dailyProgress} / {dailyGoal} XP toward daily loop</p>
             <Link href="/learn" className="mt-4 inline-flex text-sm font-medium text-[var(--brand-primary)] hover:underline">
               Earn more XP →
             </Link>
           </Card>
 
-          {/* Tip */}
           <Card padding="md" className="lg:col-span-2">
             <h2 className="font-semibold mb-2 text-[var(--foreground)]">Tip of the day</h2>
             <p className="text-[var(--text-secondary)] leading-relaxed">{tipOfDay}</p>
           </Card>
         </div>
 
-        {/* Quick actions */}
         <section aria-labelledby="quick-actions-heading">
           <h2 id="quick-actions-heading" className="text-lg font-semibold mb-4 text-[var(--foreground)]">Quick actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -186,14 +220,13 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Recent lesson activity */}
-        {token && progressData?.lessonProgress && progressData.lessonProgress.length > 0 && (
+        {token && chartLessons.length > 0 && (
           <Card padding="md">
             <h2 className="font-semibold mb-4 flex items-center gap-2 text-[var(--foreground)]">
               <TrendingUp className="w-5 h-5 text-[var(--brand-primary)]" /> Recent lesson activity
             </h2>
             <ul className="space-y-2 text-sm">
-              {progressData.lessonProgress.slice(0, 5).map((lp) => (
+              {chartLessons.slice(0, 5).map((lp) => (
                 <li key={lp.lessonId} className="flex justify-between py-2 border-b border-[var(--border)] last:border-0">
                   <span className="text-[var(--foreground)]">{lp.lesson?.title ?? "Lesson"}</span>
                   <span className={lp.completed ? "text-[var(--success)] font-medium" : "text-[var(--text-secondary)]"}>

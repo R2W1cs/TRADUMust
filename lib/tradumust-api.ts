@@ -87,9 +87,10 @@ export const recognizeApi = {
 };
 
 export const historyApi = {
-  list: (params?: { page?: number; search?: string; favorite?: boolean }) => {
+  list: (params?: { page?: number; limit?: number; search?: string; favorite?: boolean }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
     if (params?.search) q.set("search", params.search);
     if (params?.favorite) q.set("favorite", "true");
     return api<import("./api-types").HistoryListResponse>(`/api/history?${q}`);

@@ -9,7 +9,13 @@ export interface UserProgress {
 
 export interface ProgressResponse {
   progress: UserProgress | null;
-  lessonProgress: Array<{ completed: boolean; lessonId: string; lesson?: { title: string } }>;
+  lessonProgress: Array<{
+    completed: boolean;
+    lessonId: string;
+    updatedAt?: string;
+    score?: number | null;
+    lesson?: { title: string; category?: string };
+  }>;
   achievements: Array<{ achievement: { title: string; icon: string; description: string } }>;
   badges: Array<{ badge: { title: string; icon: string } }>;
   certificates: Array<{ id: string; title: string; language: string; issuedAt: string }>;

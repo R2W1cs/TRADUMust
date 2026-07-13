@@ -1,5 +1,8 @@
 generator client {
   provider = "prisma-client-js"
+  // Server is the only runtime that imports Prisma — generate into its node_modules
+  // so `cd server && npm run dev` does not hit an uninitialized stub client.
+  output   = "../server/node_modules/.prisma/client"
 }
 
 datasource db {

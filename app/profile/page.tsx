@@ -125,9 +125,9 @@ export default function ProfilePage() {
               </select>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border)]">
-              <span className="text-sm flex items-center gap-2">
-                <Contrast className="w-4 h-4" aria-hidden /> High contrast
+            <div className="flex items-center justify-between gap-4 py-2 border-b border-[var(--border)]">
+              <span className="text-sm flex items-center gap-2 min-w-0">
+                <Contrast className="w-4 h-4 shrink-0" aria-hidden /> High contrast
               </span>
               <button
                 type="button"
@@ -135,22 +135,22 @@ export default function ProfilePage() {
                 aria-checked={highContrast}
                 onClick={() => dispatch(setAccessibility({ highContrast: !highContrast }))}
                 className={cn(
-                  "w-11 h-6 rounded-full transition-colors relative",
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors",
                   highContrast ? "bg-[var(--brand-primary)]" : "bg-[var(--border)]"
                 )}
               >
                 <span
                   className={cn(
-                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                    highContrast ? "translate-x-5" : "translate-x-0.5"
+                    "pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-[left] duration-200",
+                    highContrast ? "left-[1.375rem]" : "left-0.5"
                   )}
                 />
               </button>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-[var(--border)]">
-              <span className="text-sm flex items-center gap-2">
-                <Type className="w-4 h-4" aria-hidden /> Large text
+            <div className="flex items-center justify-between gap-4 py-2 border-b border-[var(--border)]">
+              <span className="text-sm flex items-center gap-2 min-w-0">
+                <Type className="w-4 h-4 shrink-0" aria-hidden /> Large text
               </span>
               <button
                 type="button"
@@ -158,35 +158,35 @@ export default function ProfilePage() {
                 aria-checked={largeText}
                 onClick={() => dispatch(setAccessibility({ largeText: !largeText }))}
                 className={cn(
-                  "w-11 h-6 rounded-full transition-colors relative",
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors",
                   largeText ? "bg-[var(--brand-primary)]" : "bg-[var(--border)]"
                 )}
               >
                 <span
                   className={cn(
-                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                    largeText ? "translate-x-5" : "translate-x-0.5"
+                    "pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-[left] duration-200",
+                    largeText ? "left-[1.375rem]" : "left-0.5"
                   )}
                 />
               </button>
             </div>
 
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm">Reduce motion</span>
+            <div className="flex items-center justify-between gap-4 py-2">
+              <span className="text-sm min-w-0">Reduce motion</span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={reducedMotion}
                 onClick={() => dispatch(setAccessibility({ reducedMotion: !reducedMotion }))}
                 className={cn(
-                  "w-11 h-6 rounded-full transition-colors relative",
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors",
                   reducedMotion ? "bg-[var(--brand-primary)]" : "bg-[var(--border)]"
                 )}
               >
                 <span
                   className={cn(
-                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                    reducedMotion ? "translate-x-5" : "translate-x-0.5"
+                    "pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-[left] duration-200",
+                    reducedMotion ? "left-[1.375rem]" : "left-0.5"
                   )}
                 />
               </button>
@@ -198,7 +198,11 @@ export default function ProfilePage() {
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <Award className="w-5 h-5" aria-hidden /> Certificates
           </h2>
-          {!token ? (
+          {!mounted ? (
+            <p className="text-sm text-[var(--text-secondary)]" suppressHydrationWarning>
+              Loading certificates…
+            </p>
+          ) : !token ? (
             <p className="text-sm text-[var(--text-secondary)]">Sign in to view certificates.</p>
           ) : certificates.length === 0 ? (
             <p className="text-sm text-[var(--text-secondary)]">Complete all units to earn certificates.</p>

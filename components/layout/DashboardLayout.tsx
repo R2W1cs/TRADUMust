@@ -8,7 +8,7 @@ import {
   User, LogOut, PanelLeft, PanelLeftClose, Flame, Zap, Trophy, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LogoCompact } from "@/components/Logo";
+import { LogoCompact, LogoIcon } from "@/components/Logo";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import { toggleSidebar } from "@/lib/store/slices/uiSlice";
 import { logout } from "@/lib/store/slices/authSlice";
@@ -41,42 +41,62 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
+  const expanded = sidebarOpen;
+
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
-      {/* Sidebar — fixed width; content never sits behind it */}
+      {/* Sidebar — expands with labels, collapses to icons only */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--nav-bg)] transition-transform duration-200 ease-out",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[var(--border)] bg-[var(--nav-bg)] transition-[width] duration-200 ease-out",
+          expanded ? "w-64" : "w-[4.5rem]"
         )}
         aria-label="Main navigation"
-        aria-hidden={!sidebarOpen}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] p-4">
-          <Link href="/dashboard"><LogoCompact /></Link>
+        <div
+          className={cn(
+            "flex h-16 shrink-0 items-center border-b border-[var(--border)] gap-1",
+            expanded ? "justify-between px-3" : "flex-col justify-center gap-1 px-1.5 py-2 h-auto min-h-16"
+          )}
+        >
+          <Link
+            href="/dashboard"
+            className={cn("min-w-0", !expanded && "flex justify-center w-full")}
+            title="TRADUMUST"
+          >
+            {expanded ? (
+              <LogoCompact />
+            ) : (
+              <LogoIcon className="h-9 w-9" />
+            )}
+          </Link>
           <button
             type="button"
             onClick={() => dispatch(toggleSidebar())}
-            className="rounded-[var(--radius-md)] p-2 hover:bg-[var(--surface-muted)]"
-            aria-label="Close navigation"
+            className="rounded-[var(--radius-md)] p-2 hover:bg-[var(--surface-muted)] shrink-0"
+            aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+            aria-expanded={expanded}
+            title={expanded ? "Collapse" : "Expand"}
           >
-            <PanelLeftClose className="h-5 w-5" />
+            {expanded ? (
+              <PanelLeftClose className="h-5 w-5" />
+            ) : (
+              <PanelLeft className="h-5 w-5" />
+            )}
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className={cn("flex-1 space-y-1 overflow-y-auto overflow-x-hidden", expanded ? "p-3" : "p-2")}>
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               prefetch={true}
-              onClick={() => {
-                if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                  dispatch(toggleSidebar());
-                }
-              }}
+              title={label}
+              aria-label={label}
               className={cn(
-                "flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center rounded-[var(--radius-md)] text-sm font-medium transition-colors",
+                expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-2.5",
                 pathname.startsWith(href)
                   ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
@@ -84,56 +104,37 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               aria-current={pathname.startsWith(href) ? "page" : undefined}
             >
               <Icon className="h-5 w-5 shrink-0" aria-hidden />
-              <span>{label}</span>
+              {expanded && <span className="truncate">{label}</span>}
             </Link>
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-[var(--border)] p-3">
+        <div className={cn("shrink-0 border-t border-[var(--border)]", expanded ? "p-3" : "p-2")}>
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2.5 text-sm text-[var(--error)] hover:bg-[var(--error-bg)]"
+            title="Sign out"
+            aria-label="Sign out"
+            className={cn(
+              "flex w-full items-center rounded-[var(--radius-md)] text-sm text-[var(--error)] hover:bg-[var(--error-bg)]",
+              expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-2.5"
+            )}
           >
-            <LogOut className="h-5 w-5" />
-            <span>Sign out</span>
+            <LogOut className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded && <span>Sign out</span>}
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {mounted && sidebarOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-          onClick={() => dispatch(toggleSidebar())}
-          aria-label="Close menu"
-        />
-      )}
-
-      {/* Main column — width = viewport minus sidebar when open */}
+      {/* Main column — offset by expanded or icon-rail width */}
       <div
         className={cn(
           "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-out",
-          sidebarOpen ? "lg:ml-64" : "lg:ml-0"
+          expanded ? "ml-64" : "ml-[4.5rem]"
         )}
       >
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--nav-bg)] px-4 shadow-sm lg:px-5">
-          <button
-            type="button"
-            onClick={() => dispatch(toggleSidebar())}
-            className="rounded-[var(--radius-md)] p-2 hover:bg-[var(--surface-muted)]"
-            aria-label={sidebarOpen ? "Hide navigation" : "Show navigation"}
-            aria-expanded={sidebarOpen}
-          >
-            {sidebarOpen ? (
-              <PanelLeftClose className="h-5 w-5" />
-            ) : (
-              <PanelLeft className="h-5 w-5" />
-            )}
-          </button>
-
-          <div className="ml-auto flex items-center gap-4">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-end border-b border-[var(--border)] bg-[var(--nav-bg)] px-4 shadow-sm lg:px-5">
+          <div className="flex items-center gap-4">
             <div className="hidden min-w-[180px] items-center gap-4 text-sm font-semibold sm:flex">
               {mounted && token ? (
                 <>
